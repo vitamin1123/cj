@@ -100,20 +100,20 @@
         :item-size="180"
         key-field="id"
         v-slot="{ item }"
-      >
+    >
         <div class="card" :class="{'male-card': item.gender === '男', 'female-card': item.gender === '女'}">
-          <div class="card-left">
-            <img :src="item.avatar" class="avatar" />
-          </div>
-          <div class="card-right">
-            <div class="info-item">年龄: {{ item.age }}</div>
-            <div class="info-item">区域: {{ item.region }}</div>
-            <div class="info-item">身高: {{ item.height }}cm</div>
-            <div class="info-item">属相: {{ item.zodiac }}</div>
-            <div class="info-item">简介: {{ item.desc }}</div>
-          </div>
+            <div class="card-left">
+                <img :src="item.avatar" class="avatar" />
+            </div>
+            <div class="card-right">
+                <div class="info-item">年龄: {{ item.age }}</div>
+                <div class="info-item">区域: {{ item.region }}</div>
+                <div class="info-item">身高: {{ item.height }}cm</div>
+                <div class="info-item">属相: {{ item.zodiac }}</div>
+                <div class="info-item">简介: {{ item.desc }}</div>
+            </div>
         </div>
-      </RecycleScroller>
+    </RecycleScroller>
     </div>
   </template>
   
@@ -212,30 +212,39 @@
   .card {
     display: flex;
     width: 96%;
-    margin: 0 auto 12px;
+    margin: 0 auto 16px;
     padding: 16px;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     min-height: 140px;
-    transition: box-shadow 0.3s ease;
-  }
+    position: relative;
+    box-shadow: none; /* 移除阴影 */
+}
+.card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 4px;
+    border-radius: 2px;
+}
+
     
-  .male-card {
-    box-shadow: 0 4px 12px rgba(173, 216, 230, 0.6);
-    border-left: 3px solid #add8e6;
-  }
-  
-  .female-card {
-    box-shadow: 0 4px 12px rgba(255, 182, 193, 0.6);
-    border-left: 3px solid #ffb6c1;
-  }
+.male-card::before {
+    background-color: #add8e6; /* 淡蓝色 */
+}
+
+.female-card::before {
+    background-color: #ffb6c1; /* 淡粉色 */
+}
     
   .card-left {
     width: 80px;
     height: 80px;
     margin-right: 16px;
-  }
+    margin-left: 8px; /* 为左侧边框留出空间 */
+}
     
   .avatar {
     width: 100%;
