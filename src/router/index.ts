@@ -5,6 +5,7 @@ import SvendView from '@/views/svend/svend.vue'
 import loginView from '@/views/login/login.vue'
 import VisMemView from '@/views/VisMemView/VisMem.vue'
 import IndexView from '@/views/IndexView/IndexView.vue'
+import HomeView from '@/views/Home/Home.vue'
 import { useAuthStore } from '@/store/authStore'
 
 const router = createRouter({
@@ -51,7 +52,16 @@ const router = createRouter({
       meta: {
         title: '首页' // 自定义标题
       }
+    },
+    {
+      path: '/home',
+      name: 'home',
+      component: HomeView,
+      meta: {
+        title: '扉页' // 自定义标题
+      }
     }
+    // HomeView
   ],
 })
 
