@@ -255,7 +255,7 @@ const tabs = [
 
 .card-image {
   width: calc(100% - 16px);
-  height: calc(224px - 16px);
+  height: 260px; /* 调整图片高度为280px */
   background-color: #D9D9D9;
   margin: 8px;
   border-radius: 4px;
