@@ -1,11 +1,10 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import Result404 from '@/views/NotFound404View/NotFound404View.vue'
-import SvendView from '@/views/svend/svend.vue'
-import loginView from '@/views/login/login.vue'
-import VisMemView from '@/views/VisMemView/VisMem.vue'
+
 import IndexView from '@/views/IndexView/IndexView.vue'
 import HomeView from '@/views/Home/Home.vue'
+import userCenterView from '@/views/userCenter/userCenter.vue'
 import { useAuthStore } from '@/store/authStore'
 
 const router = createRouter({
@@ -20,31 +19,9 @@ const router = createRouter({
         title: '404' // 自定义标题
       }
     },
-    {
-      path: '/vismem',
-      name: 'vismem',
-      component: VisMemView,
-      meta: {
-        title: '值班打卡' // 自定义标题
-      }
-    },
+    
   
-    {
-      path: '/svend',
-      name: 'svend',
-      component: SvendView,
-      meta: {
-        title: '钢板供应商' // 自定义标题
-      }
-    },
-    {
-      path: '/login',
-      name: 'login',
-      component: loginView,
-      meta: {
-        title: '登录' // 自定义标题
-      }
-    },
+    
     {
       path: '/',
       name: 'index',
@@ -59,6 +36,14 @@ const router = createRouter({
       component: HomeView,
       meta: {
         title: '扉页' // 自定义标题
+      }
+    },
+    {
+      path: '/userCenter',
+      name: 'userCenter',
+      component: userCenterView,
+      meta: {
+        title: '个人中心' // 自定义标题
       }
     }
     // HomeView

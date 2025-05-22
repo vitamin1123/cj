@@ -58,27 +58,28 @@
     </div>
 
     <!-- 底部TabBar -->
-    <div class="tab-bar">
-      <div 
+    <!-- <van-tabbar v-model="activeTab" class="custom-tabbar" :border="false">
+      <van-tabbar-item 
         v-for="tab in tabs" 
         :key="tab.id" 
-        class="tab-item"
-        :class="{ 'active': activeTab === tab.id }"
-        @click="activeTab = tab.id"
+        :name="tab.id"
+        :icon="activeTab === tab.id ? tab.iconSelected : tab.icon"
+        @click="handleTabClick(tab)"
       >
-        <img 
-          :src="activeTab === tab.id ? tab.iconSelected : tab.icon" 
-          class="tab-icon" 
-          :alt="tab.label"
-        />
-        <span class="tab-label">{{ tab.label }}</span>
-      </div>
-    </div>
+        {{ tab.label }}
+      </van-tabbar-item>
+    </van-tabbar> -->
+    <TabBar 
+      :active-tab="activeTab" 
+      @update:active-tab="activeTab = $event"
+      :tabs="tabs"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import TabBar from '@/components/TabBar.vue';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -89,8 +90,9 @@ import likeIcon from '@/assets/icons/like.svg';
 import likeSelectedIcon from '@/assets/icons/like-selected.svg';
 import smileIcon from '@/assets/icons/smile.svg';
 import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
-
+import { useRouter } from 'vue-router'
 const activeTab = ref('home');
+const router = useRouter()
 
 const tabs = [
   { 
@@ -115,9 +117,16 @@ const tabs = [
     id: 'profile', 
     label: '个人', 
     icon: smileIcon,
-    iconSelected: smileSelectedIcon
+    iconSelected: smileSelectedIcon,
+    to: '/userCenter'
   }
 ];
+
+const handleTabClick = (tab: any) => {
+  if (tab.to) {
+    router.push(tab.to);
+  }
+};
 </script>
 
 <style scoped>
@@ -297,47 +306,8 @@ const tabs = [
   color: #ff4757;
 }
 
-/* 底部TabBar样式 */
-.tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 100px;
-  background-color: transparent;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  border-top: 1px solid #f0f0f0;
-  padding: 0 16px;
-  box-sizing: border-box;
-}
+/* 自定义TabBar样式 */
 
-.tab-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  height: 100%;
-  color: #1e1e1e;
-  font-family: "Microsoft YaHei", sans-serif;
-  cursor: pointer;
-}
 
-.tab-icon {
-  width: 24px;
-  height: 24px;
-  margin-bottom: 4px;
-  object-fit: contain;
-}
 
-.tab-label {
-  font-size: 12px;
-}
-
-.tab-item.active {
-  color: #D75670;
-  font-weight: 500;
-}
 </style>
