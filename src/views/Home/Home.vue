@@ -4,13 +4,39 @@
     <div class="page-content">
       <!-- 搜索框 -->
       <div class="search-container">
-        <div class="search-box">
-          <t-icon name="search" class="search-icon" />
-          <input type="text" placeholder="搜索" class="search-input" />
+        <div class="search-card" :class="{ focused: isSearchFocused }">
+          <div class="search-box">
+            <t-icon name="search" class="search-icon" />
+            <input 
+              type="text" 
+              placeholder="搜索" 
+              class="search-input" 
+              @focus="handleSearchFocus"
+            />
+          </div>
+          
+          <div class="search-options" v-if="isSearchFocused">
+            <div class="search-option-item">
+              <div class="option-label">身高</div>
+              <div class="option-input">
+                <input type="text" placeholder="请输入身高" />
+                <van-icon name="clear" class="clear-icon" />
+              </div>
+            </div>
+            <div class="search-option-item">
+              <div class="option-label">区域</div>
+              <div class="option-input">
+                <input type="text" placeholder="请输入区域" />
+                <van-icon name="clear" class="clear-icon" />
+              </div>
+            </div>
+          </div>
         </div>
+        <!-- 遮罩层 -->
+        <div class="search-mask" v-if="isSearchFocused" @click="closeSearch"></div>
       </div>
 
-      <!-- 新闻板块 -->
+      <!-- 其他原有内容保持不变 -->
       <div class="news-section">
         <div class="news-card">
           <div class="news-image"></div>
@@ -58,17 +84,6 @@
     </div>
 
     <!-- 底部TabBar -->
-    <!-- <van-tabbar v-model="activeTab" class="custom-tabbar" :border="false">
-      <van-tabbar-item 
-        v-for="tab in tabs" 
-        :key="tab.id" 
-        :name="tab.id"
-        :icon="activeTab === tab.id ? tab.iconSelected : tab.icon"
-        @click="handleTabClick(tab)"
-      >
-        {{ tab.label }}
-      </van-tabbar-item>
-    </van-tabbar> -->
     <TabBar 
       :active-tab="activeTab" 
       @update:active-tab="activeTab = $event"
@@ -80,6 +95,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import TabBar from '@/components/TabBar.vue';
+import { useRouter } from 'vue-router'
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -90,9 +106,18 @@ import likeIcon from '@/assets/icons/like.svg';
 import likeSelectedIcon from '@/assets/icons/like-selected.svg';
 import smileIcon from '@/assets/icons/smile.svg';
 import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
-import { useRouter } from 'vue-router'
+
 const activeTab = ref('home');
 const router = useRouter()
+const isSearchFocused = ref(false);
+
+const handleSearchFocus = () => {
+  isSearchFocused.value = true;
+};
+
+const closeSearch = () => {
+  isSearchFocused.value = false;
+};
 
 const tabs = [
   { 
@@ -137,26 +162,48 @@ const handleTabClick = (tab: any) => {
   font-family: "Microsoft YaHei", sans-serif;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* 防止滚动时出现白色背景 */
+  height: 100vh;
 }
 
 .page-content {
   flex: 1;
-  margin-bottom: 60px; /* 为底部TabBar留出空间 */
+  margin-bottom: 60px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* 移除固定高度计算，让flex自动处理 */
 }
 
 .search-container {
   margin-bottom: 16px;
+  position: relative;
+  /* 添加以下属性防止搜索框展开时影响布局 */
+  z-index: 10;
+  background-color: #F2EEE8; /* 与背景色一致 */
 }
 
-.search-box {
+.search-card {
   background-color: #EBE3D7;
   border-radius: 50px;
   padding: 12px 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 10;
+}
+
+.search-card.focused {
+  border-radius: 12px;
+  padding-bottom: 16px;
+  /* 添加以下属性使搜索框展开时不影响滚动 */
+  position: absolute;
+  width: calc(100% - 32px); /* 减去左右padding */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.search-box {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .search-input {
@@ -165,8 +212,72 @@ const handleTabClick = (tab: any) => {
   outline: none;
   width: 100%;
   font-family: "Microsoft YaHei", sans-serif;
+  font-size: 14px;
 }
 
+.search-options {
+  margin-top: 12px;
+  animation: fadeIn 0.3s ease;
+}
+
+.search-option-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.option-label {
+  width: 60px;
+  font-size: 14px;
+  color: #6A6A6A;
+}
+
+.option-input {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.option-input input {
+  width: 100%;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  padding: 8px 32px 8px 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+.clear-icon {
+  position: absolute;
+  right: 8px;
+  color: #ccc;
+  font-size: 16px;
+}
+
+.search-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5); /* 添加半透明背景 */
+  z-index: 5;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 以下原有样式保持不变 */
 .news-section {
   margin-bottom: 24px;
 }
@@ -264,7 +375,7 @@ const handleTabClick = (tab: any) => {
 
 .card-image {
   width: calc(100% - 16px);
-  height: 260px; /* 调整图片高度为280px */
+  height: 260px;
   background-color: #D9D9D9;
   margin: 8px;
   border-radius: 4px;
@@ -305,9 +416,4 @@ const handleTabClick = (tab: any) => {
   align-items: center;
   color: #ff4757;
 }
-
-/* 自定义TabBar样式 */
-
-
-
 </style>
