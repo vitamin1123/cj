@@ -162,16 +162,32 @@ const handleTabClick = (tab: any) => {
   font-family: "Microsoft YaHei", sans-serif;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 防止滚动时出现白色背景 */
-  height: 100vh;
+  /* 移除 overflow: hidden 和固定高度 */
+  position: relative;
 }
 
 .page-content {
   flex: 1;
   margin-bottom: 60px;
+  /* 确保背景色延伸 */
+  background-color: #F2EEE8;
+  /* 优化滚动 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* 移除固定高度计算，让flex自动处理 */
+  /* 添加最小高度确保覆盖整个视口 */
+  min-height: calc(100vh - 92px); /* 减去padding和底部TabBar高度 */
+}
+
+/* 为body添加背景色（如果还没有的话） */
+body {
+  background-color: #F2EEE8;
+  margin: 0;
+  padding: 0;
+}
+
+/* 确保html也有背景色 */
+html {
+  background-color: #F2EEE8;
 }
 
 .search-container {
