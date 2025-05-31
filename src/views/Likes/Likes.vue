@@ -1,17 +1,43 @@
 <template>
   <div class="likes-container">
-    <!-- 页面内容 -->
     <div class="page-content">
-      <!-- 页面标题 -->
       <div class="header">
-        <h1 class="page-title">我喜欢的</h1>
+        <h1 class="page-title">喜欢</h1>
+        <!-- 添加筛选标签 -->
+        <div class="filter-tags">
+          <span 
+            v-for="filter in filters" 
+            :key="filter.id" 
+            class="filter-tag" 
+            :class="{ active: filter.active }"
+            @click="toggleFilter(filter)">
+            {{ filter.label }}
+          </span>
+        </div>
       </div>
 
-      <!-- 喜欢的人员列表 -->
-      <div class="likes-list" v-if="likedPeople.length > 0">
-        <div v-for="person in likedPeople" :key="person.id" 
-             class="person-card" 
-             @click="goToDetail(person.id)">
+      <!-- 根据当前筛选显示不同内容 -->
+      <div class="likes-list" v-if="activeFilter === 'liked'">
+        <!-- 我喜欢的列表 -->
+        <div v-for="person in likedPeople" :key="person.id" class="person-card">
+          <div class="card-image"></div>
+          <div class="card-content">
+            <div class="name">{{ person.name }}</div>
+            <div class="height-container">
+              <div class="height">{{ person.height }}cm</div>
+              <div class="heart-icon" @click.stop="removeLike(person)">
+                <van-icon name="like" class="liked" />
+              </div>
+            </div>
+            <div class="desc">{{ person.desc }}</div>
+            <div class="like-time">{{ person.likeTime }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="likes-list" v-if="activeFilter === 'likedBy'">
+        <!-- 喜欢我的列表 -->
+        <div v-for="person in likedByPeople" :key="person.id" class="person-card">
           <div class="card-image"></div>
           <div class="card-content">
             <div class="name">{{ person.name }}</div>
@@ -65,7 +91,21 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const activeTab = ref('likes');
 const router = useRouter();
 
-// 喜欢的人员列表数据
+// 添加筛选状态
+const filters = ref([
+  { id: 1, label: '我喜欢的', value: 'liked', active: true },
+  { id: 2, label: '喜欢我的', value: 'likedBy', active: false }
+]);
+
+const activeFilter = ref('liked');
+
+const toggleFilter = (filter: any) => {
+  filters.value.forEach(f => f.active = false);
+  filter.active = true;
+  activeFilter.value = filter.value;
+};
+
+// 我喜欢的列表数据
 const likedPeople = ref([
   { 
     id: 2, 
@@ -81,6 +121,12 @@ const likedPeople = ref([
     desc: '读书爱好者', 
     likeTime: '1周前'
   }
+]);
+
+// 添加喜欢我的列表数据
+const likedByPeople = ref([
+  { id: 7, name: '小明', height: 178, desc: '喜欢运动', likeTime: '1天前' },
+  { id: 8, name: '小强', height: 175, desc: '程序员', likeTime: '3天前' }
 ]);
 
 const removeLike = (person: any) => {
@@ -261,5 +307,32 @@ const tabs = [
   border-radius: 20px;
   padding: 12px 24px;
   font-size: 14px;
+}
+
+
+
+.filter-tags {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filter-tag {
+  background-color: #EBE3D7;
+  color: #6A6A6A;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.filter-tag.active {
+  background-color: #D75670;
+  color: white;
 }
 </style>

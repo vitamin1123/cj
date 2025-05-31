@@ -50,7 +50,7 @@
 
       <!-- 人员卡片列表 -->
       <div class="people-grid">
-        <div v-for="person in peopleList" :key="person.id" 
+        <div v-for="person in filteredPeopleList" :key="person.id" 
              class="person-card" 
              @click="goToDetail(person.id)">
           <div class="card-image"></div>
@@ -78,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 
@@ -104,28 +104,93 @@ const closeSearch = () => {
   isSearchFocused.value = false;
 };
 
-// 筛选标签
+// 修改筛选标签 - 支持多选独立模式
 const filters = ref([
-  { id: 1, label: '全部', active: true },
-  { id: 2, label: '在线', active: false },
-  { id: 3, label: '附近', active: false },
-  { id: 4, label: '新人', active: false }
+  { id: 1, label: '同城', active: false, type: 'location' },
+  { id: 2, label: '只看男', active: false, type: 'gender', value: 'male' },
+  { id: 3, label: '只看女', active: false, type: 'gender', value: 'female' },
+  { id: 4, label: '新人', active: false, type: 'newbie' }
 ]);
+
+// 性别筛选状态：0-取消选中，1-只看男，2-只看女
+const genderFilterState = ref(0);
 
 const toggleFilter = (filter: any) => {
-  filters.value.forEach(f => f.active = false);
-  filter.active = true;
+  if (filter.type === 'gender') {
+    // 性别筛选的三状态循环逻辑
+    if (filter.value === 'male') {
+      if (genderFilterState.value === 1) {
+        // 当前是只看男，点击后取消选中
+        genderFilterState.value = 0;
+        filters.value.forEach(f => {
+          if (f.type === 'gender') f.active = false;
+        });
+      } else {
+        // 设置为只看男
+        genderFilterState.value = 1;
+        filters.value.forEach(f => {
+          if (f.type === 'gender') {
+            f.active = f.value === 'male';
+          }
+        });
+      }
+    } else if (filter.value === 'female') {
+      if (genderFilterState.value === 2) {
+        // 当前是只看女，点击后取消选中
+        genderFilterState.value = 0;
+        filters.value.forEach(f => {
+          if (f.type === 'gender') f.active = false;
+        });
+      } else {
+        // 设置为只看女
+        genderFilterState.value = 2;
+        filters.value.forEach(f => {
+          if (f.type === 'gender') {
+            f.active = f.value === 'female';
+          }
+        });
+      }
+    }
+  } else {
+    // 其他筛选项独立切换
+    filter.active = !filter.active;
+  }
 };
 
-// 人员列表数据
+// 人员列表数据 - 添加性别字段
 const peopleList = ref([
-  { id: 1, name: '小美', height: 165, desc: '喜欢旅行和摄影', liked: false },
-  { id: 2, name: '小雅', height: 168, desc: '热爱音乐和舞蹈', liked: true },
-  { id: 3, name: '小琳', height: 162, desc: '美食爱好者', liked: false },
-  { id: 4, name: '小慧', height: 170, desc: '健身达人', liked: false },
-  { id: 5, name: '小娜', height: 166, desc: '读书爱好者', liked: true },
-  { id: 6, name: '小莉', height: 164, desc: '艺术工作者', liked: false }
+  { id: 1, name: '小美', height: 165, desc: '喜欢旅行和摄影', liked: false, gender: 'female', isNew: false },
+  { id: 2, name: '小雅', height: 168, desc: '热爱音乐和舞蹈', liked: true, gender: 'female', isNew: true },
+  { id: 3, name: '小琳', height: 162, desc: '美食爱好者', liked: false, gender: 'female', isNew: false },
+  { id: 4, name: '小明', height: 178, desc: '健身达人', liked: false, gender: 'male', isNew: false },
+  { id: 5, name: '小强', height: 175, desc: '读书爱好者', liked: true, gender: 'male', isNew: true },
+  { id: 6, name: '小刚', height: 180, desc: '艺术工作者', liked: false, gender: 'male', isNew: false }
 ]);
+
+// 根据筛选条件过滤人员列表
+const filteredPeopleList = computed(() => {
+  let filtered = [...peopleList.value];
+  
+  // 性别筛选
+  const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
+  if (activeGenderFilter) {
+    filtered = filtered.filter(person => person.gender === activeGenderFilter.value);
+  }
+  
+  // 新人筛选
+  const newbieFilter = filters.value.find(f => f.type === 'newbie');
+  if (newbieFilter && newbieFilter.active) {
+    filtered = filtered.filter(person => person.isNew);
+  }
+  
+  // 同城筛选（这里可以添加具体逻辑）
+  const locationFilter = filters.value.find(f => f.type === 'location');
+  if (locationFilter && locationFilter.active) {
+    // 这里可以添加同城筛选逻辑
+  }
+  
+  return filtered;
+});
 
 const toggleLike = (person: any) => {
   person.liked = !person.liked;
