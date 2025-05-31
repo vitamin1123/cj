@@ -1,5 +1,5 @@
 <template>
-  <div class="home-container">
+  <div class="explore-container">
     <!-- 页面内容 -->
     <div class="page-content">
       <!-- 搜索框 -->
@@ -36,51 +36,35 @@
         <div class="search-mask" v-if="isSearchFocused" @click="closeSearch"></div>
       </div>
 
-      <!-- 其他原有内容保持不变 -->
-      <div class="news-section">
-        <div class="news-card">
-          <div class="news-image"></div>
-          <p class="news-title">新人新闻</p>
+      <!-- 筛选标签 -->
+      <div class="filter-section">
+        <div class="filter-tags">
+          <span v-for="filter in filters" :key="filter.id" 
+                class="filter-tag" 
+                :class="{ active: filter.active }"
+                @click="toggleFilter(filter)">
+            {{ filter.label }}
+          </span>
         </div>
       </div>
 
-      <!-- 新人展示 -->
-      <div class="newcomer-section">
-        <h2 class="section-title">天顺新面孔</h2>
-        <van-swipe class="newcomer-swipe" :loop="true" :width="180" :height="80" :autoplay="5000" indicator-color="transparent">
-          <van-swipe-item v-for="i in 4" :key="i">
-            <div class="newcomer-card">
-              <div class="avatar"></div>
-              <div class="info">
-                <div class="title">标题</div>
-                <div class="subtitle">副标题</div>
+      <!-- 人员卡片列表 -->
+      <div class="people-grid">
+        <div v-for="person in peopleList" :key="person.id" 
+             class="person-card" 
+             @click="goToDetail(person.id)">
+          <div class="card-image"></div>
+          <div class="card-content">
+            <div class="name">{{ person.name }}</div>
+            <div class="height-container">
+              <div class="height">{{ person.height }}cm</div>
+              <div class="heart-icon" @click.stop="toggleLike(person)">
+                <van-icon name="like" :class="{ liked: person.liked }" />
               </div>
             </div>
-          </van-swipe-item>
-        </van-swipe>
-      </div>
-
-      <!-- 推荐板块 -->
-      <div class="recommend-section">
-        <h2 class="section-title">可能感兴趣</h2>
-        <van-swipe class="recommend-swipe" :loop="true" :width="240" :height="366" indicator-color="transparent">
-          <van-swipe-item v-for="i in 4" :key="i">
-            <!-- 在推荐卡片上添加点击事件 -->
-            <div class="recommend-card" @click="goToDetail(i)">
-              <div class="card-image"></div>
-              <div class="card-content">
-                <div class="name">姓名</div>
-                <div class="height-container">
-                  <div class="height">身高</div>
-                  <div class="heart-icon">
-                    <van-icon name="like" />
-                  </div>
-                </div>
-                <div class="desc">简介</div>
-              </div>
-            </div>
-          </van-swipe-item>
-        </van-swipe>
+            <div class="desc">{{ person.desc }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -96,7 +80,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import TabBar from '@/components/TabBar.vue';
-import { useRouter } from 'vue-router'
+import { useRouter } from 'vue-router';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -108,8 +92,8 @@ import likeSelectedIcon from '@/assets/icons/like-selected.svg';
 import smileIcon from '@/assets/icons/smile.svg';
 import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 
-const activeTab = ref('home');
-const router = useRouter()
+const activeTab = ref('explore');
+const router = useRouter();
 const isSearchFocused = ref(false);
 
 const handleSearchFocus = () => {
@@ -118,6 +102,37 @@ const handleSearchFocus = () => {
 
 const closeSearch = () => {
   isSearchFocused.value = false;
+};
+
+// 筛选标签
+const filters = ref([
+  { id: 1, label: '全部', active: true },
+  { id: 2, label: '在线', active: false },
+  { id: 3, label: '附近', active: false },
+  { id: 4, label: '新人', active: false }
+]);
+
+const toggleFilter = (filter: any) => {
+  filters.value.forEach(f => f.active = false);
+  filter.active = true;
+};
+
+// 人员列表数据
+const peopleList = ref([
+  { id: 1, name: '小美', height: 165, desc: '喜欢旅行和摄影', liked: false },
+  { id: 2, name: '小雅', height: 168, desc: '热爱音乐和舞蹈', liked: true },
+  { id: 3, name: '小琳', height: 162, desc: '美食爱好者', liked: false },
+  { id: 4, name: '小慧', height: 170, desc: '健身达人', liked: false },
+  { id: 5, name: '小娜', height: 166, desc: '读书爱好者', liked: true },
+  { id: 6, name: '小莉', height: 164, desc: '艺术工作者', liked: false }
+]);
+
+const toggleLike = (person: any) => {
+  person.liked = !person.liked;
+};
+
+const goToDetail = (id: number) => {
+  router.push(`/detail/${id}`);
 };
 
 const tabs = [
@@ -132,8 +147,7 @@ const tabs = [
     id: 'explore', 
     label: '寻觅', 
     icon: compassIcon,
-    iconSelected: compassSelectedIcon,
-    to: '/explore'
+    iconSelected: compassSelectedIcon
   },
   { 
     id: 'likes', 
@@ -150,61 +164,34 @@ const tabs = [
     to: '/userCenter'
   }
 ];
-
-const handleTabClick = (tab: any) => {
-  if (tab.to) {
-    router.push(tab.to);
-  }
-};
-
-
-const goToDetail = (id: number) => {
-  router.push(`/detail/${id}`);
-};
 </script>
 
 <style scoped>
-.home-container {
+.explore-container {
   background-color: #F2EEE8;
   min-height: 100vh;
   padding: 16px;
   font-family: "Microsoft YaHei", sans-serif;
   display: flex;
   flex-direction: column;
-  /* 移除 overflow: hidden 和固定高度 */
   position: relative;
 }
 
 .page-content {
   flex: 1;
   margin-bottom: 60px;
-  /* 确保背景色延伸 */
   background-color: #F2EEE8;
-  /* 优化滚动 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* 添加最小高度确保覆盖整个视口 */
-  min-height: calc(100vh - 92px); /* 减去padding和底部TabBar高度 */
+  min-height: calc(100vh - 92px);
 }
 
-/* 为body添加背景色（如果还没有的话） */
-body {
-  background-color: #F2EEE8;
-  margin: 0;
-  padding: 0;
-}
-
-/* 确保html也有背景色 */
-html {
-  background-color: #F2EEE8;
-}
-
+/* 搜索框样式 - 复用Home页面样式 */
 .search-container {
   margin-bottom: 16px;
   position: relative;
-  /* 添加以下属性防止搜索框展开时影响布局 */
   z-index: 10;
-  background-color: #F2EEE8; /* 与背景色一致 */
+  background-color: #F2EEE8;
 }
 
 .search-card {
@@ -219,9 +206,8 @@ html {
 .search-card.focused {
   border-radius: 12px;
   padding-bottom: 16px;
-  /* 添加以下属性使搜索框展开时不影响滚动 */
   position: absolute;
-  width: calc(100% - 32px); /* 减去左右padding */
+  width: calc(100% - 32px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -287,8 +273,101 @@ html {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5); /* 添加半透明背景 */
+  background: rgba(0, 0, 0, 0.5);
   z-index: 5;
+}
+
+/* 筛选标签 */
+.filter-section {
+  margin-bottom: 16px;
+}
+
+.filter-tags {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filter-tag {
+  background-color: #EBE3D7;
+  color: #6A6A6A;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.filter-tag.active {
+  background-color: #D75670;
+  color: white;
+}
+
+/* 人员卡片网格 */
+.people-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.person-card {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #D9D9D9;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.person-card:active {
+  transform: scale(0.98);
+}
+
+.card-image {
+  width: 100%;
+  height: 200px;
+  background-color: #D9D9D9;
+}
+
+.card-content {
+  padding: 12px;
+}
+
+.name {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.height-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.height {
+  font-size: 14px;
+  color: #6A6A6A;
+}
+
+.heart-icon {
+  font-size: 18px;
+  color: #ccc;
+  transition: color 0.3s;
+}
+
+.heart-icon .liked {
+  color: #ff4757;
+}
+
+.desc {
+  font-size: 12px;
+  color: #6A6A6A;
+  line-height: 1.4;
 }
 
 @keyframes fadeIn {
@@ -300,145 +379,5 @@ html {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* 以下原有样式保持不变 */
-.news-section {
-  margin-bottom: 24px;
-}
-
-.news-card {
-  background-color: #D9D9D9;
-  border-radius: 8px;
-  padding: 16px;
-  min-height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #D9D9D9;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.news-title {
-  color: #6A6A6A;
-  font-size: 16px;
-}
-
-.section-title {
-  color: #6A6A6A;
-  font-size: 16px;
-  margin-bottom: 16px;
-  font-weight: normal;
-}
-
-.newcomer-section {
-  margin-bottom: 24px;
-}
-
-.newcomer-swipe {
-  padding-left: 0;
-}
-
-.newcomer-card {
-  background-color: #FFFFFF;
-  border-radius: 8px;
-  width: 172px;
-  height: 80px;
-  display: flex;
-  padding: 8px;
-  box-sizing: border-box;
-  border: 1px solid #D9D9D9;
-  margin-right: 8px;
-}
-
-.avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: #D9D9D9;
-  margin-right: 12px;
-  align-self: center;
-}
-
-.info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.title {
-  font-size: 14px;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.subtitle {
-  font-size: 12px;
-  color: #6A6A6A;
-}
-
-.recommend-section {
-  margin-bottom: 24px;
-}
-
-.recommend-swipe {
-  padding-left: 0;
-}
-
-.recommend-card {
-  background-color: #FFFFFF;
-  border-radius: 8px;
-  width: 224px;
-  height: 366px;
-  margin-right: 8px;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid #D9D9D9;
-}
-
-.card-image {
-  width: calc(100% - 16px);
-  height: 260px;
-  background-color: #D9D9D9;
-  margin: 8px;
-  border-radius: 4px;
-}
-
-.card-content {
-  padding: 0 16px 16px;
-}
-
-.name {
-  font-size: 14px;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.height-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 8px;
-}
-
-.height {
-  font-size: 12px;
-  color: #6A6A6A;
-}
-
-.desc {
-  font-size: 12px;
-  color: #6A6A6A;
-  line-height: 1.4;
-}
-
-.heart-icon {
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  color: #ff4757;
 }
 </style>

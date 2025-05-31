@@ -78,13 +78,15 @@
       id: 'explore', 
       label: '寻觅', 
       icon: compassIcon,
-      iconSelected: compassSelectedIcon
+      iconSelected: compassSelectedIcon,
+      to: '/explore'
     },
     { 
       id: 'likes', 
       label: '喜欢', 
       icon: likeIcon,
-      iconSelected: likeSelectedIcon
+      iconSelected: likeSelectedIcon,
+      to: '/likes'
     },
     { 
       id: 'profile', 

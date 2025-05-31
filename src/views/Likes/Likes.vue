@@ -1,0 +1,265 @@
+<template>
+  <div class="likes-container">
+    <!-- 页面内容 -->
+    <div class="page-content">
+      <!-- 页面标题 -->
+      <div class="header">
+        <h1 class="page-title">我喜欢的</h1>
+      </div>
+
+      <!-- 喜欢的人员列表 -->
+      <div class="likes-list" v-if="likedPeople.length > 0">
+        <div v-for="person in likedPeople" :key="person.id" 
+             class="person-card" 
+             @click="goToDetail(person.id)">
+          <div class="card-image"></div>
+          <div class="card-content">
+            <div class="name">{{ person.name }}</div>
+            <div class="height-container">
+              <div class="height">{{ person.height }}cm</div>
+              <div class="heart-icon" @click.stop="removeLike(person)">
+                <van-icon name="like" class="liked" />
+              </div>
+            </div>
+            <div class="desc">{{ person.desc }}</div>
+            <div class="like-time">{{ person.likeTime }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div class="empty-state" v-else>
+        <div class="empty-icon">
+          <van-icon name="like" />
+        </div>
+        <p class="empty-text">还没有喜欢的人</p>
+        <p class="empty-desc">去寻觅页面看看吧</p>
+        <van-button class="explore-btn" @click="goToExplore">去寻觅</van-button>
+      </div>
+    </div>
+
+    <!-- 底部TabBar -->
+    <TabBar 
+      :active-tab="activeTab" 
+      @update:active-tab="activeTab = $event"
+      :tabs="tabs"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+import TabBar from '@/components/TabBar.vue';
+import { useRouter } from 'vue-router';
+
+// 导入图标
+import homeIcon from '@/assets/icons/home.svg';
+import homeSelectedIcon from '@/assets/icons/home-selected.svg';
+import compassIcon from '@/assets/icons/compass.svg';
+import compassSelectedIcon from '@/assets/icons/compass-selected.svg';
+import likeIcon from '@/assets/icons/like.svg';
+import likeSelectedIcon from '@/assets/icons/like-selected.svg';
+import smileIcon from '@/assets/icons/smile.svg';
+import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
+
+const activeTab = ref('likes');
+const router = useRouter();
+
+// 喜欢的人员列表数据
+const likedPeople = ref([
+  { 
+    id: 2, 
+    name: '小雅', 
+    height: 168, 
+    desc: '热爱音乐和舞蹈', 
+    likeTime: '2天前'
+  },
+  { 
+    id: 5, 
+    name: '小娜', 
+    height: 166, 
+    desc: '读书爱好者', 
+    likeTime: '1周前'
+  }
+]);
+
+const removeLike = (person: any) => {
+  const index = likedPeople.value.findIndex(p => p.id === person.id);
+  if (index > -1) {
+    likedPeople.value.splice(index, 1);
+  }
+};
+
+const goToDetail = (id: number) => {
+  router.push(`/detail/${id}`);
+};
+
+const goToExplore = () => {
+  router.push('/explore');
+};
+
+const tabs = [
+  { 
+    id: 'home', 
+    label: '首页', 
+    icon: homeIcon,
+    iconSelected: homeSelectedIcon,
+    to: '/home'
+  },
+  { 
+    id: 'explore', 
+    label: '寻觅', 
+    icon: compassIcon,
+    iconSelected: compassSelectedIcon,
+    to: '/explore'
+  },
+  { 
+    id: 'likes', 
+    label: '喜欢', 
+    icon: likeIcon,
+    iconSelected: likeSelectedIcon
+  },
+  { 
+    id: 'profile', 
+    label: '个人', 
+    icon: smileIcon,
+    iconSelected: smileSelectedIcon,
+    to: '/userCenter'
+  }
+];
+</script>
+
+<style scoped>
+.likes-container {
+  background-color: #F2EEE8;
+  min-height: 100vh;
+  padding: 16px;
+  font-family: "Microsoft YaHei", sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-content {
+  flex: 1;
+  margin-bottom: 60px;
+  background-color: #F2EEE8;
+  min-height: calc(100vh - 92px);
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+.likes-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.person-card {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #D9D9D9;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.person-card:active {
+  transform: scale(0.98);
+}
+
+.card-image {
+  width: 100%;
+  height: 200px;
+  background-color: #D9D9D9;
+}
+
+.card-content {
+  padding: 12px;
+}
+
+.name {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.height-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.height {
+  font-size: 14px;
+  color: #6A6A6A;
+}
+
+.heart-icon {
+  font-size: 18px;
+  transition: color 0.3s;
+}
+
+.heart-icon .liked {
+  color: #ff4757;
+}
+
+.desc {
+  font-size: 12px;
+  color: #6A6A6A;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.like-time {
+  font-size: 11px;
+  color: #999;
+}
+
+/* 空状态样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: #D9D9D9;
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 18px;
+  color: #6A6A6A;
+  margin: 0 0 8px 0;
+}
+
+.empty-desc {
+  font-size: 14px;
+  color: #999;
+  margin: 0 0 24px 0;
+}
+
+.explore-btn {
+  background-color: #D75670;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 12px 24px;
+  font-size: 14px;
+}
+</style>

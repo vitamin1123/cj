@@ -6,6 +6,9 @@ import IndexView from '@/views/IndexView/IndexView.vue'
 import HomeView from '@/views/Home/Home.vue'
 import userCenterView from '@/views/userCenter/userCenter.vue'
 import { useAuthStore } from '@/store/authStore'
+import DetailView from '@/views/Detail/Detail.vue'
+import ExploreView from '@/views/Explore/Explore.vue'
+import LikesView from '@/views/Likes/Likes.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,8 +48,33 @@ const router = createRouter({
       meta: {
         title: '个人中心' // 自定义标题
       }
-    }
+    },
     // HomeView
+    // 在routes数组中添加新路由
+    {
+      path: '/detail/:id',
+      name: 'detail',
+      component: DetailView,
+      meta: {
+        title: '详细信息'
+      }
+    },
+    {
+      path: '/explore',
+      name: 'explore',
+      component: ExploreView,
+      meta: {
+        title: '寻觅'
+      }
+    },
+    {
+      path: '/likes',
+      name: 'likes',
+      component: LikesView,
+      meta: {
+        title: '喜欢'
+      }
+    }
   ],
 })
 
