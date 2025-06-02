@@ -28,7 +28,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'index',
-      component: IndexView,
+      component: HomeView,
       meta: {
         title: '首页' // 自定义标题
       }
@@ -74,6 +74,11 @@ const router = createRouter({
       meta: {
         title: '喜欢'
       }
+    },
+    {
+      path: '/profile-setup',
+      name: 'ProfileSetup',
+      component: () => import('@/views/ProfileSetup/ProfileSetup.vue')
     }
   ],
 })
