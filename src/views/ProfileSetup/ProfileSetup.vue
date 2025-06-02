@@ -82,7 +82,13 @@
                   <div class="calendar-header">
                     <van-icon name="arrow-left" @click="navigateMonth('prev')" class="nav-arrow" />
                     <div class="header-title">
-                      {{ currentDate.getFullYear() }}年{{ currentDate.getMonth() + 1 }}月
+                      {{ calendarType === 'solar' ? 
+                         `${currentDate.getFullYear()}年${currentDate.getMonth() + 1}月` : 
+                         lunarHeaderTitle 
+                      }}
+                      <div class="lunar-year-info" v-if="calendarType === 'solar'">
+                        {{ lunarYearInfo }}
+                      </div>
                     </div>
                     <van-icon name="arrow" @click="navigateMonth('next')" class="nav-arrow" />
                   </div>
@@ -94,6 +100,7 @@
                   
                   <!-- 日历组件 -->
                   <van-calendar
+                    :key="calendarType"
                     :poppable="false"
                     :show-confirm="false"
                     v-model:current-date="currentDate"
@@ -121,7 +128,7 @@
               
               <van-popup v-model:show="showTimePicker" position="bottom">
                 <van-time-picker
-                  v-model="formData.birthTime"
+                  :model-value="[formData.birthTime]"
                   title="选择出生时间"
                   @confirm="onTimeConfirm"
                   @cancel="showTimePicker = false"
@@ -218,7 +225,13 @@
           <p class="card-subtitle">选择你的收入范围</p>
           <div class="income-options">
             <div 
-              v-for="income in incomeOptions" 
+              v-for="income in [
+                { value: '1', label: '5k以下' },
+                { value: '2', label: '5k-10k' },
+                { value: '3', label: '10k-20k' },
+                { value: '4', label: '20k-50k' },
+                { value: '5', label: '50k以上' }
+              ]"
               :key="income.value"
               class="income-option"
               :class="{ active: formData.income === income.value }"
@@ -238,7 +251,13 @@
           <p class="card-subtitle">你的教育背景</p>
           <div class="education-options">
             <div 
-              v-for="edu in educationOptions" 
+              v-for="edu in [
+                { value: '1', label: '高中及以下' },
+                { value: '2', label: '大专' },
+                { value: '3', label: '本科' },
+                { value: '4', label: '硕士' },
+                { value: '5', label: '博士' }
+              ]"
               :key="edu.value"
               class="education-option"
               :class="{ active: formData.education === edu.value }"
@@ -275,7 +294,12 @@
           <p class="card-subtitle">你的人格类型</p>
           <div class="mbti-options">
             <div 
-              v-for="mbti in mbtiOptions" 
+              v-for="mbti in [
+                'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
+                'ISTP', 'ISFP', 'INFP', 'INTP',
+                'ESTP', 'ESFP', 'ENFP', 'ENTP',
+                'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ'
+              ]"
               :key="mbti"
               class="mbti-option"
               :class="{ active: formData.mbti === mbti }"
@@ -380,6 +404,22 @@ const minDate = new Date(1950, 0, 1);
 const maxDate = new Date(2010, 11, 31);
 const currentDate = ref(new Date());
 
+// 计算农历月份标题
+const lunarHeaderTitle = computed(() => {
+  const date = currentDate.value;
+  const solar = Solar.fromDate(date);
+  const lunar = solar.getLunar();
+  return `农历${lunar.getMonthInChinese()}月`;
+});
+
+// 计算农历年份信息（生肖和年份）
+const lunarYearInfo = computed(() => {
+  const date = currentDate.value;
+  const solar = Solar.fromDate(date);
+  const lunar = solar.getLunar();
+  return `${lunar.getYearInChinese()}年 ${lunar.getYearShengXiao()}年`;
+});
+
 // 农历日期格式化函数
 const formatter = (day: any) => {
   const date = new Date(day.date);
@@ -391,23 +431,27 @@ const formatter = (day: any) => {
     day.className = 'weekend-red';
   }
   
-  // 显示农历信息
-  if (calendarType.value === 'lunar') {
-    // 优先显示节日
-    const festivals = lunar.getFestivals();
-    if (festivals.length > 0) {
-      day.bottomInfo = festivals[0];
+  // 农历信息
+  let lunarInfo = '';
+  
+  // 优先显示节日
+  const festivals = lunar.getFestivals();
+  if (festivals.length > 0) {
+    lunarInfo = festivals[0];
+  } else {
+    // 显示节气
+    const jieQi = lunar.getJieQi();
+    if (jieQi) {
+      lunarInfo = jieQi;
     } else {
-      // 显示节气
-      const jieQi = lunar.getJieQi();
-      if (jieQi) {
-        day.bottomInfo = jieQi;
-      } else {
-        // 显示农历日期
-        day.bottomInfo = lunar.getDayInChinese();
-      }
+      // 显示农历日期
+      lunarInfo = lunar.getDayInChinese();
     }
   }
+  
+  // 在顶部显示公历日期，底部显示农历信息
+  day.topInfo = day.type === 'selected' ? '' : `${date.getDate()}`;
+  day.bottomInfo = lunarInfo;
   
   return day;
 };
@@ -453,7 +497,7 @@ const formatDisplayDate = computed(() => {
   } else {
     const solar = Solar.fromDate(date);
     const lunar = solar.getLunar();
-    return `农历${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
+    return `农历${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
   }
 });
 
@@ -872,6 +916,16 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 500;
   color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lunar-year-info {
+  font-size: 12px;
+  color: #D75670;
+  margin-top: 4px;
+  font-weight: normal;
 }
 
 .nav-arrow {
@@ -934,6 +988,12 @@ onMounted(() => {
   height: 44px;
 }
 
+.custom-calendar :deep(.van-calendar__top-info) {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+}
+
 .custom-calendar :deep(.van-calendar__bottom-info) {
   font-size: 10px;
   color: #999;
@@ -943,6 +1003,11 @@ onMounted(() => {
 .custom-calendar :deep(.van-calendar__selected-day) {
   background-color: #D75670;
   color: white;
+}
+
+.custom-calendar :deep(.van-calendar__selected-day .van-calendar__top-info),
+.custom-calendar :deep(.van-calendar__selected-day .van-calendar__bottom-info) {
+  color: white !important;
 }
 
 /* 日期时间按钮 */
