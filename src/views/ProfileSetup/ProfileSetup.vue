@@ -49,98 +49,39 @@
       <!-- 出生日期和时间 -->
       <van-swipe-item>
         <div class="setup-card">
-          <div class="card-icon">🎂</div>
-          <h2 class="card-title">出生信息</h2>
-          <p class="card-subtitle">告诉我们你的生日和出生时间</p>
-          
-          <!-- 历法选择 -->
-          <div class="calendar-type-selector">
-            <button 
-              class="calendar-type-btn" 
-              :class="{ active: calendarType === 'solar' }"
-              @click="toggleCalendar('solar')"
-            >
-              公历
-            </button>
-            <button 
-              class="calendar-type-btn" 
-              :class="{ active: calendarType === 'lunar' }"
-              @click="toggleCalendar('lunar')"
-            >
-              农历
-            </button>
-          </div>
-          
-          <!-- 日期时间选择 -->
-          <div class="date-time-container">
-            <!-- 日期选择 -->
-            <div class="date-section">
-              <label class="section-label">出生日期</label>
-              
-              <!-- 自定义日历弹窗 -->
-              <van-popup v-model:show="showDatePicker" position="bottom" :style="{ height: '70%' }">
-                <div class="custom-calendar-container">
-                  <!-- 日历头部导航 -->
-                  <div class="calendar-header">
-                    <van-icon name="arrow-left" @click="navigateMonth('prev')" class="nav-arrow" />
-                    <div class="header-title">
-                      {{ `${currentDate.getFullYear()}年${currentDate.getMonth() + 1}月` }}
-                    </div>
-                    <van-icon name="arrow" @click="navigateMonth('next')" class="nav-arrow" />
-                  </div>
-                  
-                  <div class="calendar-actions">
-                    <button class="today-btn" @click="goToday">回今天</button>
-                    <button class="confirm-btn" @click="showDatePicker = false">确定</button>
-                  </div>
-                  
-                  <!-- 日历组件 -->
-                  <van-calendar
-                    :key="calendarType"
-                    :poppable="false"
-                    :show-confirm="false"
-                    v-model:current-date="currentDate"
-                    :formatter="formatter"
-                    :min-date="minDate"
-                    :max-date="maxDate"
-                    @select="onDateConfirm"
-                    class="custom-calendar"
-                  />
-                </div>
-              </van-popup>
-              
-              <button 
-                class="btn-secondary date-btn" 
-                @click="showDatePicker = true"
-              >
-                {{ formatDisplayDate }}
-                <span class="btn-icon">📅</span>
-              </button>
-            </div>
-            
-            <!-- 时间选择 -->
-            <div class="time-section">
-              <label class="section-label">出生时间</label>
-              
-              <van-popup v-model:show="showTimePicker" position="bottom">
-                <van-time-picker
-                  :model-value="[formData.birthTime]"
-                  title="选择出生时间"
-                  @confirm="onTimeConfirm"
-                  @cancel="showTimePicker = false"
-                />
-              </van-popup>
-              
-              <button 
-                class="btn-secondary time-btn" 
-                @click="showTimePicker = true"
-              >
-                {{ formData.birthTime }}
-                <span class="btn-icon">🕐</span>
-              </button>
-            </div>
-          </div>
+    <div class="card-icon animate-bounce">🎂</div>
+    <h2 class="card-title">出生信息</h2>
+    <p class="card-subtitle">告诉我们你的生日</p>
+    
+    <!-- 日期选择 -->
+    <div class="date-section">
+      <label class="section-label">
+        出生日期 <span class="required-mark">*</span>
+      </label>
+      <van-popup v-model:show="showDatePicker" position="bottom">
+        <van-date-picker
+          v-model="currentDate"
+          :min-date="minDate"
+          :max-date="maxDate"
+          title="选择出生日期"
+          @confirm="onDateConfirm"
+          @cancel="showDatePicker = false"
+          :columns-type="['year', 'month', 'day']"
+        />
+      </van-popup>
+      <button 
+        class="btn-secondary date-btn animate-scale" 
+        @click="showDatePicker = true" 
+        :class="{ 'has-value': formData.birthDate }"
+      >
+        <div class="date-display">
+          <div class="main-date">{{ formatSolar(formData.birthDate) }}</div>
+          <div class="sub-date">{{ formatLunar(formData.birthDate) }}</div>
         </div>
+        <span class="btn-icon">📅</span>
+      </button>
+    </div>
+  </div>
       </van-swipe-item>
 
       <!-- 身高 -->
@@ -384,24 +325,31 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast, Calendar, Popup, Icon, Field } from 'vant';
 import { areaList } from '@vant/area-data';
-
-import { Solar, Lunar } from 'lunar-typescript';
+import lunisolar from 'lunisolar';
 
 const router = useRouter();
 const swipeRef = ref();
 const currentStep = ref(1);
 const totalSteps = 12;
 const showDatePicker = ref(false);
-const showTimePicker = ref(false);
+const dateValue = ref(new Date());
+
+const currentDate = ref([
+  new Date().getFullYear(),
+  new Date().getMonth() + 1,
+  new Date().getDate()
+]);
+
+const minDate = new Date(1980, 0, 1);
+const maxDate = new Date(2100, 12, 31);
+
 const showAreaPicker = ref(false); // New ref for area picker
 // 直接使用导入的areaList数据
-const calendarType = ref('solar'); // 'solar' 公历, 'lunar' 农历
 
 // 表单数据
 const formData = ref({
   gender: '',
-  birthDate: new Date(),
-  birthTime: '12:00',
+  birthDate: null as Date | null,
   height: '',
   weight: '',
   region: '',
@@ -419,89 +367,26 @@ watch(currentStep, (newVal) => {
   // 当currentStep变化时，更新swipe位置
   swipeRef.value?.swipeTo(newVal - 1);
 });
-// 日期范围
-const minDate = new Date(1950, 0, 1);
-const maxDate = new Date(2010, 11, 31);
-const currentDate = ref(new Date());
 const weightValidator = (value: string | number) => {
   return Number(value) <= 250;
 };
-// 农历日期格式化函数
-const formatter = (day: any) => {
-  const date = new Date(day.date);
-  const solar = Solar.fromDate(date);
-  const lunar = solar.getLunar();
-  
-  // 设置周末样式
-  if (date.getDay() === 0 || date.getDay() === 6) {
-    day.className = 'weekend-red';
-  }
-  
-  // 显示农历信息
-  if (calendarType.value === 'lunar') {
-    // 获取农历节日
-    const festivals = lunar.getFestivals();
-    if (festivals && festivals.length > 0) {
-      day.bottomInfo = festivals[0];
-    } else {
-      // 获取节气
-      const jieQi = lunar.getJieQi();
-      if (jieQi) {
-        day.bottomInfo = jieQi;
-      } else {
-        // 显示农历日期
-        day.bottomInfo = lunar.getDayInChinese();
-      }
-    }
-  }
-  
-  return day;
-};
 
-// 月份导航
-const navigateMonth = (direction: 'prev' | 'next') => {
-  const current = new Date(currentDate.value);
-  if (direction === 'prev') {
-    current.setMonth(current.getMonth() - 1);
-  } else {
-    current.setMonth(current.getMonth() + 1);
-  }
-  currentDate.value = current;
-};
-
-// 回到今天
-const goToday = () => {
-  currentDate.value = new Date();
-};
-
-// 历法切换
-const toggleCalendar = (type: 'solar' | 'lunar') => {
-  calendarType.value = type;
-};
-
-// 日期确认
-const onDateConfirm = (value: Date) => {
-  formData.value.birthDate = value;
+const onDateConfirm = ({ selectedValues }: { selectedValues: number[] }) => {
+  const [year, month, day] = selectedValues;
+  const selectedDate = new Date(year, month - 1, day);
+  formData.value.birthDate = selectedDate;
   showDatePicker.value = false;
 };
 
-// 时间确认
-const onTimeConfirm = (value: string) => {
-  formData.value.birthTime = value;
-  showTimePicker.value = false;
+const formatSolar = (date: Date | null) => {
+  if (!date) return '请选择出生日期';
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 };
 
-// 格式化显示日期
-const formatDisplayDate = computed(() => {
-  const date = formData.value.birthDate;
-  if (calendarType.value === 'solar') {
-    return date.toLocaleDateString('zh-CN');
-  } else {
-    const solar = Solar.fromDate(date);
-    const lunar = solar.getLunar();
-    return `农历${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
-  }
-});
+const formatLunar = (date: Date | null) => {
+  if (!date) return '';
+  return lunisolar(date).format('lY年(cZ年) lMlD');
+};
 
 // 地区选择确认 - 更新为Vant4格式
 const onAreaConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
@@ -553,7 +438,7 @@ const heightValidator = (value: string | number) => {
 const canProceed = computed(() => {
   switch (currentStep.value) {
     case 1: return formData.value.gender !== '';
-    case 2: return true; // 日期有默认值
+    case 2: return formData.value.birthDate !== null;
     case 3: return formData.value.height !== '' && heightValidator(formData.value.height);
     case 4: return formData.value.weight !== '';
     case 5: return formData.value.region !== '';
@@ -601,6 +486,9 @@ const submitForm = async () => {
 };
 
 onMounted(() => {
+  // 初始化当前日期为今天
+  dateValue.value = formData.value.birthDate || new Date();
+  
   // 检查是否已经登录和是否需要填写信息
   // 这里可以添加openid检查逻辑
 });
@@ -977,41 +865,11 @@ onMounted(() => {
   background-color: #E0E0E0;
 }
 
-/* 历法选择器 */
-.calendar-type-selector {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  justify-content: center;
-}
-
-.calendar-type-btn {
-  padding: 8px 16px;
-  border: 1px solid #E0D5C7;
-  background-color: #FFFFFF;
-  color: #6A6A6A;
-  border-radius: 20px;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.calendar-type-btn.active {
-  background-color: #D75670;
-  color: #FFFFFF;
-  border-color: #D75670;
-}
-
-/* 日期时间容器 */
-.date-time-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.date-section,
-.time-section {
+/* 日期选择区域 */
+.date-section {
   text-align: left;
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 .section-label {
@@ -1019,7 +877,13 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 500;
   color: #333;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.required-mark {
+  color: #D75670;
+  font-weight: bold;
 }
 
 /* 自定义日历容器 */
@@ -1036,19 +900,23 @@ onMounted(() => {
   padding: 0 8px;
 }
 
+/* 日历头部样式 */
 .header-title {
-  font-size: 18px;
-  font-weight: 500;
-  color: #333;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 4px;
 }
 
-.lunar-year-info {
+.main-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.sub-title {
   font-size: 12px;
   color: #D75670;
-  margin-top: 4px;
   font-weight: normal;
 }
 
@@ -1096,6 +964,7 @@ onMounted(() => {
 .custom-calendar :deep(.van-calendar__weekdays) {
   color: #666;
   font-size: 14px;
+  padding-bottom: 8px;
 }
 
 .custom-calendar :deep(.van-calendar__weekday:first-child),
@@ -1109,24 +978,32 @@ onMounted(() => {
 
 .custom-calendar :deep(.van-calendar__day) {
   font-size: 16px;
-  height: 44px;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
 }
 
 .custom-calendar :deep(.van-calendar__top-info) {
-  font-size: 14px;
-  font-weight: bold;
+  font-size: 16px;
+  font-weight: 500;
   color: #333;
+  line-height: 1;
 }
 
 .custom-calendar :deep(.van-calendar__bottom-info) {
-  font-size: 10px;
+  font-size: 11px;
   color: #999;
+  line-height: 1;
   margin-top: 2px;
 }
 
 .custom-calendar :deep(.van-calendar__selected-day) {
   background-color: #D75670;
   color: white;
+  border-radius: 8px;
 }
 
 .custom-calendar :deep(.van-calendar__selected-day .van-calendar__top-info),
@@ -1134,29 +1011,97 @@ onMounted(() => {
   color: white !important;
 }
 
-/* 日期时间按钮 */
-.date-btn,
-.time-btn {
+/* 日期按钮样式优化 */
+.date-btn {
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 16px;
   font-size: 16px;
-  border: 1px solid #E0D5C7;
+  border: 2px solid #E0D5C7;
   background-color: #FFFFFF;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 70px;
 }
 
-.date-btn:hover,
-.time-btn:hover {
+.date-btn.has-value {
   border-color: #D75670;
+  background-color: #FFF8FA;
+}
+
+.date-btn:hover {
+  border-color: #D75670;
+  box-shadow: 0 2px 8px rgba(215, 86, 112, 0.1);
+  transform: translateY(-1px);
+}
+
+/* 日期显示样式 */
+.date-display {
+  text-align: left;
+  flex: 1;
+}
+
+.main-date {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.sub-date {
+  font-size: 13px;
+  color: #D75670;
+  font-weight: normal;
+  line-height: 1.2;
+  margin-top: 4px;
 }
 
 .btn-icon {
-  font-size: 18px;
+  font-size: 20px;
+  color: #D75670;
+}
+
+/* 动画效果 */
+.animate-bounce {
+  animation: bounce 2s infinite;
+}
+
+.animate-scale {
+  transition: transform 0.2s ease;
+}
+
+.animate-scale:active {
+  transform: scale(0.98);
+}
+
+.card-enter {
+  animation: cardEnter 0.5s ease-out;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 统一设置所有输入框placeholder居中 */
