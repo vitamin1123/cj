@@ -14,8 +14,10 @@
       :loop="false" 
       :show-indicators="false"
       :touchable="false"
+      :vertical="false"
+      :stop-propagation="true" 
+      :prevent-default="true" 
       ref="swipeRef"
-      @change="onSwipeChange"
     >
       <!-- 性别选择 -->
       <van-swipe-item>
@@ -82,13 +84,7 @@
                   <div class="calendar-header">
                     <van-icon name="arrow-left" @click="navigateMonth('prev')" class="nav-arrow" />
                     <div class="header-title">
-                      {{ calendarType === 'solar' ? 
-                         `${currentDate.getFullYear()}年${currentDate.getMonth() + 1}月` : 
-                         lunarHeaderTitle 
-                      }}
-                      <div class="lunar-year-info" v-if="calendarType === 'solar'">
-                        {{ lunarYearInfo }}
-                      </div>
+                      {{ `${currentDate.getFullYear()}年${currentDate.getMonth() + 1}月` }}
                     </div>
                     <van-icon name="arrow" @click="navigateMonth('next')" class="nav-arrow" />
                   </div>
@@ -154,13 +150,22 @@
           <h2 class="card-title">身高</h2>
           <p class="card-subtitle">请输入你的身高</p>
           <div class="input-container">
-            <input 
-              type="number" 
-              v-model="formData.height" 
-              placeholder="请输入身高"
+            <van-field
+              v-model="formData.height"
+              type="number"
+              label="身高"
+              :maxlength="3"
+              :min="120"
+              :max="240"
+              input-align="center"
+              :formatter="heightFormatter"
+              :rules="[{ required: true, message: '请输入身高' }, { validator: heightValidator, message: '身高范围120-240cm' }]"
               class="setup-input"
-            />
-            <span class="input-unit">cm</span>
+            >
+              <template #right-icon>
+                <span class="input-unit">cm</span>
+              </template>
+            </van-field>
           </div>
         </div>
       </van-swipe-item>
@@ -172,13 +177,19 @@
           <h2 class="card-title">体重</h2>
           <p class="card-subtitle">请输入你的体重</p>
           <div class="input-container">
-            <input 
-              type="number" 
-              v-model="formData.weight" 
-              placeholder="请输入体重"
+            <van-field
+              v-model="formData.weight"
+              type="number"
+              label="体重"
+              input-align="center"
+              :max="250"
+              :rules="[{ required: true, message: '请输入体重' }, { validator: weightValidator, message: '体重不能超过250kg' }]"
               class="setup-input"
-            />
-            <span class="input-unit">kg</span>
+            >
+              <template #right-icon>
+                <span class="input-unit">kg</span>
+              </template>
+            </van-field>
           </div>
         </div>
       </van-swipe-item>
@@ -188,15 +199,31 @@
         <div class="setup-card">
           <div class="card-icon">📍</div>
           <h2 class="card-title">所在地区</h2>
-          <p class="card-subtitle">选择你的所在城市</p>
+          <p class="card-subtitle">选择你的所在地</p>
           <div class="input-container">
-            <input 
-              type="text" 
-              v-model="formData.location" 
-              placeholder="请输入所在城市"
-              class="setup-input"
+            <van-field
+              v-model="formData.region"
+              is-link
+              readonly
+              label="所在地区"
+              placeholder="请选择所在地区"
+              @click="showAreaPicker = true"
+              input-align="center"
+              :rules="[{ required: true, message: '请选择所在地区' }]"
             />
           </div>
+          
+          <!-- Area选择器弹窗 -->
+          <van-popup v-model:show="showAreaPicker" position="bottom">
+            <van-area
+              v-model="formData.regionCode"
+              title="选择地区"
+              :area-list="areaList"
+              @confirm="onAreaConfirm"
+              @cancel="showAreaPicker = false"
+              :columns-placeholder="['请选择省', '请选择市', '请选择区']"
+            />
+          </van-popup>
         </div>
       </van-swipe-item>
 
@@ -207,11 +234,12 @@
           <h2 class="card-title">职业</h2>
           <p class="card-subtitle">你从事什么工作</p>
           <div class="input-container">
-            <input 
-              type="text" 
-              v-model="formData.occupation" 
+            <van-field
+              v-model="formData.occupation"
+              label="职业"
               placeholder="请输入职业"
-              class="setup-input"
+              input-align="center"
+              :rules="[{ required: true, message: '请输入职业' }]"
             />
           </div>
         </div>
@@ -225,13 +253,7 @@
           <p class="card-subtitle">选择你的收入范围</p>
           <div class="income-options">
             <div 
-              v-for="income in [
-                { value: '1', label: '5k以下' },
-                { value: '2', label: '5k-10k' },
-                { value: '3', label: '10k-20k' },
-                { value: '4', label: '20k-50k' },
-                { value: '5', label: '50k以上' }
-              ]"
+              v-for="income in incomeOptions"
               :key="income.value"
               class="income-option"
               :class="{ active: formData.income === income.value }"
@@ -251,13 +273,7 @@
           <p class="card-subtitle">你的教育背景</p>
           <div class="education-options">
             <div 
-              v-for="edu in [
-                { value: '1', label: '高中及以下' },
-                { value: '2', label: '大专' },
-                { value: '3', label: '本科' },
-                { value: '4', label: '硕士' },
-                { value: '5', label: '博士' }
-              ]"
+              v-for="edu in educationOptions"
               :key="edu.value"
               class="education-option"
               :class="{ active: formData.education === edu.value }"
@@ -294,12 +310,7 @@
           <p class="card-subtitle">你的人格类型</p>
           <div class="mbti-options">
             <div 
-              v-for="mbti in [
-                'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
-                'ISTP', 'ISFP', 'INFP', 'INTP',
-                'ESTP', 'ESFP', 'ENFP', 'ENTP',
-                'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ'
-              ]"
+              v-for="mbti in mbtiOptions"
               :key="mbti"
               class="mbti-option"
               :class="{ active: formData.mbti === mbti }"
@@ -334,7 +345,7 @@
         <div class="setup-card">
           <div class="card-icon">🔒</div>
           <h2 class="card-title">隐私简介</h2>
-          <p class="card-subtitle">只有匹配的人才能看到</p>
+          <p class="card-subtitle">只有陈姐能看到</p>
           <div class="textarea-container">
             <textarea 
               v-model="formData.privateBio" 
@@ -369,10 +380,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Swipe, SwipeItem, DatePicker, TimePicker, Toast, Calendar, Popup, Icon } from 'vant';
-import { Lunar, Solar } from 'lunar-javascript';
+import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast, Calendar, Popup, Icon, Field } from 'vant';
+import { areaList } from '@vant/area-data';
+
+import { Solar, Lunar } from 'lunar-typescript';
 
 const router = useRouter();
 const swipeRef = ref();
@@ -380,6 +393,8 @@ const currentStep = ref(1);
 const totalSteps = 12;
 const showDatePicker = ref(false);
 const showTimePicker = ref(false);
+const showAreaPicker = ref(false); // New ref for area picker
+// 直接使用导入的areaList数据
 const calendarType = ref('solar'); // 'solar' 公历, 'lunar' 农历
 
 // 表单数据
@@ -389,7 +404,8 @@ const formData = ref({
   birthTime: '12:00',
   height: '',
   weight: '',
-  location: '',
+  region: '',
+  regionCode: '', // 新增：存储地区码
   occupation: '',
   income: '',
   education: '',
@@ -399,27 +415,17 @@ const formData = ref({
   privateBio: ''
 });
 
+watch(currentStep, (newVal) => {
+  // 当currentStep变化时，更新swipe位置
+  swipeRef.value?.swipeTo(newVal - 1);
+});
 // 日期范围
 const minDate = new Date(1950, 0, 1);
 const maxDate = new Date(2010, 11, 31);
 const currentDate = ref(new Date());
-
-// 计算农历月份标题
-const lunarHeaderTitle = computed(() => {
-  const date = currentDate.value;
-  const solar = Solar.fromDate(date);
-  const lunar = solar.getLunar();
-  return `农历${lunar.getMonthInChinese()}月`;
-});
-
-// 计算农历年份信息（生肖和年份）
-const lunarYearInfo = computed(() => {
-  const date = currentDate.value;
-  const solar = Solar.fromDate(date);
-  const lunar = solar.getLunar();
-  return `${lunar.getYearInChinese()}年 ${lunar.getYearShengXiao()}年`;
-});
-
+const weightValidator = (value: string | number) => {
+  return Number(value) <= 250;
+};
 // 农历日期格式化函数
 const formatter = (day: any) => {
   const date = new Date(day.date);
@@ -431,27 +437,23 @@ const formatter = (day: any) => {
     day.className = 'weekend-red';
   }
   
-  // 农历信息
-  let lunarInfo = '';
-  
-  // 优先显示节日
-  const festivals = lunar.getFestivals();
-  if (festivals.length > 0) {
-    lunarInfo = festivals[0];
-  } else {
-    // 显示节气
-    const jieQi = lunar.getJieQi();
-    if (jieQi) {
-      lunarInfo = jieQi;
+  // 显示农历信息
+  if (calendarType.value === 'lunar') {
+    // 获取农历节日
+    const festivals = lunar.getFestivals();
+    if (festivals && festivals.length > 0) {
+      day.bottomInfo = festivals[0];
     } else {
-      // 显示农历日期
-      lunarInfo = lunar.getDayInChinese();
+      // 获取节气
+      const jieQi = lunar.getJieQi();
+      if (jieQi) {
+        day.bottomInfo = jieQi;
+      } else {
+        // 显示农历日期
+        day.bottomInfo = lunar.getDayInChinese();
+      }
     }
   }
-  
-  // 在顶部显示公历日期，底部显示农历信息
-  day.topInfo = day.type === 'selected' ? '' : `${date.getDate()}`;
-  day.bottomInfo = lunarInfo;
   
   return day;
 };
@@ -497,28 +499,99 @@ const formatDisplayDate = computed(() => {
   } else {
     const solar = Solar.fromDate(date);
     const lunar = solar.getLunar();
-    return `农历${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
+    return `农历${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
   }
 });
 
-const onSwipeChange = (index: number) => {
-  currentStep.value = index + 1;
+// 地区选择确认 - 更新为Vant4格式
+const onAreaConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
+  // selectedOptions是一个数组，包含选中的省市区信息
+  const regionNames = selectedOptions.map(option => option.text).join('-');
+  const regionCodes = selectedOptions.map(option => option.value);
+  
+  formData.value.region = regionNames;
+  formData.value.regionCode = regionCodes[regionCodes.length - 1]; // 存储最后一级的地区码
+  showAreaPicker.value = false;
 };
+
+// 选项数据
+const incomeOptions = [
+  { label: '3K以下', value: 'below_3k' },
+  { label: '3K-5K', value: '3k_5k' },
+  { label: '5K-8K', value: '5k_8k' },
+  { label: '8K-12K', value: '8k_12k' },
+  { label: '12K-20K', value: '12k_20k' },
+  { label: '20K以上', value: 'above_20k' }
+];
+
+const educationOptions = [
+  { label: '高中及以下', value: 'high_school' },
+  { label: '大专', value: 'college' },
+  { label: '本科', value: 'bachelor' },
+  { label: '硕士', value: 'master' },
+  { label: '博士', value: 'phd' }
+];
+
+const mbtiOptions = [
+  'INTJ', 'INTP', 'ENTJ', 'ENTP',
+  'INFJ', 'INFP', 'ENFJ', 'ENFP',
+  'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+  'ISTP', 'ISFP', 'ESTP', 'ESFP'
+];
+
+// 身高输入格式化器
+const heightFormatter = (value: string) => {
+  // 只允许输入数字，且最大3位
+  return value.replace(/[^\d]/g, '').slice(0, 3);
+};
+const heightValidator = (value: string | number) => {
+  const num = Number(value);
+  return num >= 120 && num <= 240;
+};
+
+// 计算是否可以继续
+const canProceed = computed(() => {
+  switch (currentStep.value) {
+    case 1: return formData.value.gender !== '';
+    case 2: return true; // 日期有默认值
+    case 3: return formData.value.height !== '' && heightValidator(formData.value.height);
+    case 4: return formData.value.weight !== '';
+    case 5: return formData.value.region !== '';
+    case 6: return formData.value.occupation !== '';
+    case 7: return formData.value.income !== '';
+    case 8: return formData.value.education !== '';
+    case 9: return true; // 信仰可选
+    case 10: return formData.value.mbti !== '';
+    case 11: return formData.value.bio.trim() !== '';
+    case 12: return true; // 隐私简介可选
+    default: return false;
+  }
+});
+
+// 方法
+// const onSwipeChange = (index: number) => {
+//   currentStep.value = index + 1;
+// };
 
 const nextStep = () => {
   if (currentStep.value === totalSteps) {
     submitForm();
   } else {
-    swipeRef.value?.next();
+    // swipeRef.value?.next();
+    currentStep.value++;
+    swipeRef.value?.swipeTo(currentStep.value - 1);
   }
 };
 
 const prevStep = () => {
-  swipeRef.value?.prev();
+//   swipeRef.value?.prev();
+currentStep.value--;
+  swipeRef.value?.swipeTo(currentStep.value - 1);
 };
 
 const submitForm = async () => {
   try {
+    // 这里调用API提交表单数据
     console.log('提交表单数据:', formData.value);
     Toast.success('信息保存成功！');
     router.push('/home');
@@ -526,25 +599,6 @@ const submitForm = async () => {
     Toast.fail('保存失败，请重试');
   }
 };
-
-// 计算是否可以继续
-const canProceed = computed(() => {
-  switch (currentStep.value) {
-    case 1: return formData.value.gender !== '';
-    case 2: return true;
-    case 3: return formData.value.height !== '';
-    case 4: return formData.value.weight !== '';
-    case 5: return formData.value.location !== '';
-    case 6: return formData.value.occupation !== '';
-    case 7: return formData.value.income !== '';
-    case 8: return formData.value.education !== '';
-    case 9: return true;
-    case 10: return formData.value.mbti !== '';
-    case 11: return formData.value.bio.trim() !== '';
-    case 12: return true;
-    default: return false;
-  }
-});
 
 onMounted(() => {
   // 检查是否已经登录和是否需要填写信息
@@ -592,22 +646,48 @@ onMounted(() => {
 
 /* 滑动容器 */
 .setup-swipe {
-  flex: 1;
-  padding: 0 16px;
+  width: 100vw;
+  overflow: hidden !important; /* 隐藏溢出内容 */
+  touch-action: none !important; /* 禁用触摸操作 */
 }
 
 /* 卡片样式 */
 .setup-card {
-  background-color: #FFFFFF;
-  border-radius: 16px;
+  width: 96vw;
+  margin: 20px auto;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.08);
+  background: #fff;
+  transition: box-shadow 0.3s, transform 0.3s;
+  position: relative;
+  z-index: 2;
   padding: 40px 24px;
-  margin: 20px 0;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   min-height: 400px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+/* 淡化左右卡片 */
+.van-swipe-item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: filter 0.3s, opacity 0.3s, transform 0.3s;
+}
+.van-swipe-item:not(.van-swipe-item-active) .setup-card {
+  /* 去除模糊和灰度，仅保留透明和缩放 */
+  filter: none;
+  opacity: 0.6;
+  transform: scale(0.95);
+  z-index: 1;
+}
+.van-swipe-item.van-swipe-item-active .setup-card {
+  filter: none;
+  opacity: 1;
+  transform: scale(1);
+  z-index: 2;
 }
 
 .card-icon {
@@ -666,14 +746,20 @@ onMounted(() => {
 
 .setup-input {
   width: 100%;
-  padding: 16px 20px;
-  border: 2px solid #E0E0E0;
-  border-radius: 12px;
+  padding: 16px;
   font-size: 16px;
+  border: 1px solid #E0D5C7;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #333;
   text-align: center;
-  background-color: #F8F8F8;
   outline: none;
   transition: border-color 0.3s ease;
+}
+
+.setup-input::placeholder {
+  color: #999;
+  text-align: center;
 }
 
 .setup-input:focus {
@@ -701,14 +787,21 @@ onMounted(() => {
   width: 100%;
   min-height: 120px;
   padding: 16px;
-  border: 2px solid #E0E0E0;
-  border-radius: 12px;
   font-size: 16px;
-  background-color: #F8F8F8;
-  outline: none;
-  resize: none;
+  border: 1px solid #E0D5C7;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #333;
+  resize: vertical;
   font-family: "Microsoft YaHei", sans-serif;
+  text-align: center;
+  outline: none;
   transition: border-color 0.3s ease;
+}
+
+.setup-textarea::placeholder {
+  color: #999;
+  text-align: center;
 }
 
 .setup-textarea:focus {
@@ -843,6 +936,37 @@ onMounted(() => {
   background-color: #F8F8F8;
   color: #333;
   border: 2px solid #E0E0E0;
+}
+
+/* 统一设置所有输入框placeholder居中 */
+.van-field__control {
+  text-align: center !important;
+}
+.van-field__control::placeholder {
+  text-align: center !important;
+}
+
+/* 普通input输入框 */
+.setup-input {
+  text-align: center;
+}
+.setup-input::placeholder {
+  text-align: center;
+}
+
+/* textarea输入框 */
+.setup-textarea {
+  text-align: center;
+}
+.setup-textarea::placeholder {
+  text-align: center;
+}
+
+:deep(.van-field__control) {
+  text-align: center !important;
+}
+:deep(.van-field__control::placeholder) {
+  text-align: center !important;
 }
 
 .btn-primary:not(:disabled):active {
@@ -1033,6 +1157,37 @@ onMounted(() => {
 
 .btn-icon {
   font-size: 18px;
+}
+
+/* 统一设置所有输入框placeholder居中 */
+.van-field__control {
+  text-align: center !important;
+}
+.van-field__control::placeholder {
+  text-align: center !important;
+}
+
+/* 普通input输入框 */
+.setup-input {
+  text-align: center;
+}
+.setup-input::placeholder {
+  text-align: center;
+}
+
+/* textarea输入框 */
+.setup-textarea {
+  text-align: center;
+}
+.setup-textarea::placeholder {
+  text-align: center;
+}
+
+:deep(.van-field__control) {
+  text-align: center !important;
+}
+:deep(.van-field__control::placeholder) {
+  text-align: center !important;
 }
 
 .btn-primary:not(:disabled):active {
