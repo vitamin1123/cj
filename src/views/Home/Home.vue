@@ -1,7 +1,33 @@
 <template>
   <div class="home-container">
+    <!-- 骨架屏 -->
+    <div v-if="isLoading" class="skeleton-container">
+      <div class="skeleton-search"></div>
+      <div class="skeleton-news"></div>
+      <div class="skeleton-section">
+        <div class="skeleton-title"></div>
+        <div class="skeleton-cards">
+          <div v-for="i in 3" :key="i" class="skeleton-card"></div>
+        </div>
+      </div>
+      <div class="skeleton-section">
+        <div class="skeleton-title"></div>
+        <div class="skeleton-cards">
+          <div v-for="i in 2" :key="i" class="skeleton-recommend-card"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 错误提示 -->
+    <div v-else-if="authError" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <div class="error-title">认证失败</div>
+      <div class="error-message">{{ authError }}</div>
+      <button class="retry-button" @click="retryAuth">重试</button>
+    </div>
+
     <!-- 页面内容 -->
-    <div class="page-content">
+    <div v-else class="page-content">
       <!-- 搜索框 -->
       <div class="search-container">
         <div class="search-card" :class="{ focused: isSearchFocused }">
@@ -86,6 +112,7 @@
 
     <!-- 底部TabBar -->
     <TabBar 
+      v-if="!isLoading && !authError"
       :active-tab="activeTab" 
       @update:active-tab="activeTab = $event"
       :tabs="tabs"
@@ -94,9 +121,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router'
+import { useWechatStore } from '@/store/wechatStore'
+import { Toast } from 'vant'
+import axios from 'axios'
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -111,6 +141,14 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const activeTab = ref('home');
 const router = useRouter()
 const isSearchFocused = ref(false);
+const wechatStore = useWechatStore()
+
+// 加载和错误状态
+const isLoading = ref(true)
+const authError = ref<string | null>(null)
+
+// 配置axios基础URL
+axios.defaults.baseURL = 'http://localhost:8080'
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -157,10 +195,59 @@ const handleTabClick = (tab: any) => {
   }
 };
 
-
 const goToDetail = (id: number) => {
   router.push(`/detail/${id}`);
 };
+
+// 重试认证
+const retryAuth = async () => {
+  authError.value = null
+  await initializeAuth()
+}
+
+// 初始化认证
+const initializeAuth = async () => {
+  isLoading.value = true
+  authError.value = null
+
+  try {
+    // 首先尝试使用已存储的token
+    const hasValidToken = await wechatStore.initialize()
+    
+    if (hasValidToken) {
+      isLoading.value = false
+      return
+    }
+
+    // 如果没有有效token，尝试从URL获取openid
+    const openid = wechatStore.getOpenidFromUrl()
+    
+    if (!openid) {
+      // 在实际环境中，这里应该重定向到微信授权页面
+      // 测试环境下，我们可以使用一个测试openid
+      authError.value = '未获取到openid，请通过微信访问'
+      isLoading.value = false
+      return
+    }
+
+    // 使用openid进行认证
+    const success = await wechatStore.authenticate(openid)
+    
+    if (!success) {
+      authError.value = wechatStore.error || '认证失败'
+    }
+
+  } catch (error: any) {
+    console.error('初始化认证失败:', error)
+    authError.value = '网络错误，请检查网络连接'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  await initializeAuth()
+})
 </script>
 
 <style scoped>
@@ -171,30 +258,148 @@ const goToDetail = (id: number) => {
   font-family: "Microsoft YaHei", sans-serif;
   display: flex;
   flex-direction: column;
-  /* 移除 overflow: hidden 和固定高度 */
   position: relative;
+}
+
+/* 骨架屏样式 */
+.skeleton-container {
+  flex: 1;
+  margin-bottom: 60px;
+}
+
+.skeleton-search {
+  height: 48px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 24px;
+  margin-bottom: 16px;
+}
+
+.skeleton-news {
+  height: 150px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.skeleton-section {
+  margin-bottom: 24px;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 120px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.skeleton-cards {
+  display: flex;
+  gap: 8px;
+  overflow-x: hidden;
+}
+
+.skeleton-card {
+  width: 172px;
+  height: 80px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.skeleton-recommend-card {
+  width: 224px;
+  height: 366px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 错误容器样式 */
+.error-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.error-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.error-message {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.retry-button {
+  background-color: #007AFF;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.retry-button:hover {
+  background-color: #0056CC;
+}
+
+.retry-button:active {
+  background-color: #004499;
 }
 
 .page-content {
   flex: 1;
   margin-bottom: 60px;
-  /* 确保背景色延伸 */
   background-color: #F2EEE8;
-  /* 优化滚动 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* 添加最小高度确保覆盖整个视口 */
-  min-height: calc(100vh - 92px); /* 减去padding和底部TabBar高度 */
+  min-height: calc(100vh - 92px);
 }
 
-/* 为body添加背景色（如果还没有的话） */
+/* ... existing code ... */
+
 body {
   background-color: #F2EEE8;
   margin: 0;
   padding: 0;
 }
 
-/* 确保html也有背景色 */
 html {
   background-color: #F2EEE8;
 }
@@ -202,9 +407,8 @@ html {
 .search-container {
   margin-bottom: 16px;
   position: relative;
-  /* 添加以下属性防止搜索框展开时影响布局 */
   z-index: 10;
-  background-color: #F2EEE8; /* 与背景色一致 */
+  background-color: #F2EEE8;
 }
 
 .search-card {
@@ -219,9 +423,8 @@ html {
 .search-card.focused {
   border-radius: 12px;
   padding-bottom: 16px;
-  /* 添加以下属性使搜索框展开时不影响滚动 */
   position: absolute;
-  width: calc(100% - 32px); /* 减去左右padding */
+  width: calc(100% - 32px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -287,7 +490,7 @@ html {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5); /* 添加半透明背景 */
+  background: rgba(0, 0, 0, 0.5);
   z-index: 5;
 }
 
@@ -302,7 +505,8 @@ html {
   }
 }
 
-/* 以下原有样式保持不变 */
+/* ... existing code ... */
+
 .news-section {
   margin-bottom: 24px;
 }

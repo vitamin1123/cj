@@ -11,7 +11,9 @@
               type="text" 
               placeholder="搜索" 
               class="search-input" 
+              v-model="searchKeyword"
               @focus="handleSearchFocus"
+              @input="handleSearch"
             />
           </div>
           
@@ -19,15 +21,15 @@
             <div class="search-option-item">
               <div class="option-label">身高</div>
               <div class="option-input">
-                <input type="text" placeholder="请输入身高" />
-                <van-icon name="clear" class="clear-icon" />
+                <input type="text" placeholder="请输入身高" v-model="heightFilter" @input="handleSearch" />
+                <van-icon name="clear" class="clear-icon" @click="heightFilter = ''; handleSearch()" />
               </div>
             </div>
             <div class="search-option-item">
               <div class="option-label">区域</div>
               <div class="option-input">
-                <input type="text" placeholder="请输入区域" />
-                <van-icon name="clear" class="clear-icon" />
+                <input type="text" placeholder="请输入区域" v-model="regionFilter" @input="handleSearch" />
+                <van-icon name="clear" class="clear-icon" @click="regionFilter = ''; handleSearch()" />
               </div>
             </div>
           </div>
@@ -55,14 +57,15 @@
              @click="goToDetail(person.id)">
           <div class="card-image"></div>
           <div class="card-content">
-            <div class="name">{{ person.name }}</div>
+            <div class="name" v-html="highlightText(person.name, searchKeyword)"></div>
             <div class="height-container">
               <div class="height">{{ person.height }}cm</div>
               <div class="heart-icon" @click.stop="toggleLike(person)">
                 <van-icon name="like" :class="{ liked: person.liked }" />
               </div>
             </div>
-            <div class="desc">{{ person.desc }}</div>
+            <div class="desc" v-html="highlightText(person.bio || person.occupation, searchKeyword)"></div>
+            <div class="region" v-html="highlightText(person.region, searchKeyword)"></div>
           </div>
         </div>
       </div>
@@ -78,9 +81,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
+import { Toast } from 'vant';
+import { match } from 'pinyin-match';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -95,6 +101,13 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const activeTab = ref('explore');
 const router = useRouter();
 const isSearchFocused = ref(false);
+const searchKeyword = ref('');
+const heightFilter = ref('');
+const regionFilter = ref('');
+
+// 两个列表：全部数据和过滤后的数据
+const allPeopleList = ref([]);
+const filteredPeopleList = ref([]);
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -102,6 +115,69 @@ const handleSearchFocus = () => {
 
 const closeSearch = () => {
   isSearchFocused.value = false;
+};
+
+// 搜索处理函数
+const handleSearch = () => {
+  let filtered = [...allPeopleList.value];
+  
+  // 关键字搜索（使用pinyin-match）
+  if (searchKeyword.value.trim()) {
+    filtered = filtered.filter(person => {
+      const searchFields = [
+        person.name,
+        person.bio || '',
+        person.occupation || '',
+        person.region || '',
+        person.education || '',
+        person.mbti || ''
+      ].join(' ');
+      
+      return match(searchFields, searchKeyword.value.trim());
+    });
+  }
+  
+  // 身高筛选
+  if (heightFilter.value.trim()) {
+    const height = parseInt(heightFilter.value);
+    if (!isNaN(height)) {
+      filtered = filtered.filter(person => 
+        Math.abs(person.height - height) <= 5 // 允许±5cm的误差
+      );
+    }
+  }
+  
+  // 区域筛选
+  if (regionFilter.value.trim()) {
+    filtered = filtered.filter(person => 
+      match(person.region || '', regionFilter.value.trim())
+    );
+  }
+  
+  // 应用其他筛选条件
+  const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
+  if (activeGenderFilter) {
+    filtered = filtered.filter(person => person.gender === activeGenderFilter.value);
+  }
+  
+  const newbieFilter = filters.value.find(f => f.type === 'newbie');
+  if (newbieFilter && newbieFilter.active) {
+    filtered = filtered.filter(person => person.isNew);
+  }
+  
+  filteredPeopleList.value = filtered;
+};
+
+// 高亮匹配文本
+const highlightText = (text, keyword) => {
+  if (!text || !keyword.trim()) return text;
+  
+  const matchResult = match(text, keyword.trim());
+  if (!matchResult) return text;
+  
+  // 简单的高亮实现
+  const regex = new RegExp(`(${keyword.trim()})`, 'gi');
+  return text.replace(regex, '<span class="highlight">$1</span>');
 };
 
 // 修改筛选标签 - 支持多选独立模式
@@ -115,18 +191,16 @@ const filters = ref([
 // 性别筛选状态：0-取消选中，1-只看男，2-只看女
 const genderFilterState = ref(0);
 
-const toggleFilter = (filter: any) => {
+const toggleFilter = (filter) => {
   if (filter.type === 'gender') {
     // 性别筛选的三状态循环逻辑
     if (filter.value === 'male') {
       if (genderFilterState.value === 1) {
-        // 当前是只看男，点击后取消选中
         genderFilterState.value = 0;
         filters.value.forEach(f => {
           if (f.type === 'gender') f.active = false;
         });
       } else {
-        // 设置为只看男
         genderFilterState.value = 1;
         filters.value.forEach(f => {
           if (f.type === 'gender') {
@@ -136,13 +210,11 @@ const toggleFilter = (filter: any) => {
       }
     } else if (filter.value === 'female') {
       if (genderFilterState.value === 2) {
-        // 当前是只看女，点击后取消选中
         genderFilterState.value = 0;
         filters.value.forEach(f => {
           if (f.type === 'gender') f.active = false;
         });
       } else {
-        // 设置为只看女
         genderFilterState.value = 2;
         filters.value.forEach(f => {
           if (f.type === 'gender') {
@@ -152,51 +224,56 @@ const toggleFilter = (filter: any) => {
       }
     }
   } else {
-    // 其他筛选项独立切换
     filter.active = !filter.active;
+  }
+  
+  // 重新应用筛选
+  handleSearch();
+};
+
+// 加载用户数据
+const loadUserProfiles = async () => {
+  try {
+    const token = localStorage.getItem('wechat_token');
+    if (!token) {
+      Toast.fail('请先登录');
+      return;
+    }
+    
+    const response = await axios.get('/profiles', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    allPeopleList.value = response.data.map(profile => ({
+      id: profile.id,
+      name: profile.name,
+      height: profile.height,
+      gender: profile.gender,
+      region: profile.region,
+      occupation: profile.occupation,
+      education: profile.education,
+      mbti: profile.mbti,
+      bio: profile.bio,
+      liked: false, // 这里可以从后端获取用户的喜欢状态
+      isNew: false // 这里可以根据创建时间判断是否为新用户
+    }));
+    
+    // 初始化过滤列表
+    filteredPeopleList.value = [...allPeopleList.value];
+    
+  } catch (error) {
+    console.error('加载用户数据失败:', error);
+    Toast.fail('加载数据失败');
   }
 };
 
-// 人员列表数据 - 添加性别字段
-const peopleList = ref([
-  { id: 1, name: '小美', height: 165, desc: '喜欢旅行和摄影', liked: false, gender: 'female', isNew: false },
-  { id: 2, name: '小雅', height: 168, desc: '热爱音乐和舞蹈', liked: true, gender: 'female', isNew: true },
-  { id: 3, name: '小琳', height: 162, desc: '美食爱好者', liked: false, gender: 'female', isNew: false },
-  { id: 4, name: '小明', height: 178, desc: '健身达人', liked: false, gender: 'male', isNew: false },
-  { id: 5, name: '小强', height: 175, desc: '读书爱好者', liked: true, gender: 'male', isNew: true },
-  { id: 6, name: '小刚', height: 180, desc: '艺术工作者', liked: false, gender: 'male', isNew: false }
-]);
-
-// 根据筛选条件过滤人员列表
-const filteredPeopleList = computed(() => {
-  let filtered = [...peopleList.value];
-  
-  // 性别筛选
-  const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
-  if (activeGenderFilter) {
-    filtered = filtered.filter(person => person.gender === activeGenderFilter.value);
-  }
-  
-  // 新人筛选
-  const newbieFilter = filters.value.find(f => f.type === 'newbie');
-  if (newbieFilter && newbieFilter.active) {
-    filtered = filtered.filter(person => person.isNew);
-  }
-  
-  // 同城筛选（这里可以添加具体逻辑）
-  const locationFilter = filters.value.find(f => f.type === 'location');
-  if (locationFilter && locationFilter.active) {
-    // 这里可以添加同城筛选逻辑
-  }
-  
-  return filtered;
-});
-
-const toggleLike = (person: any) => {
+const toggleLike = (person) => {
   person.liked = !person.liked;
 };
 
-const goToDetail = (id: number) => {
+const goToDetail = (id) => {
   router.push(`/detail/${id}`);
 };
 
@@ -229,6 +306,10 @@ const tabs = [
     to: '/userCenter'
   }
 ];
+
+onMounted(() => {
+  loadUserProfiles();
+});
 </script>
 
 <style scoped>
@@ -435,6 +516,12 @@ const tabs = [
   line-height: 1.4;
 }
 
+.region {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -444,5 +531,12 @@ const tabs = [
     opacity: 1;
     transform: translateY(0);
   }
+}
+.highlight {
+  background-color: #FFE066;
+  color: #333;
+  font-weight: bold;
+  padding: 0 2px;
+  border-radius: 2px;
 }
 </style>

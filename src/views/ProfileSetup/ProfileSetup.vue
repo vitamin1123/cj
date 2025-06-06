@@ -158,11 +158,10 @@
           <van-popup v-model:show="showAreaPicker" position="bottom">
             <van-area
               v-model="formData.regionCode"
-              title="选择地区"
               :area-list="areaList"
+              :columns-placeholder="['', '', '']"
+              title="选择地区"
               @confirm="onAreaConfirm"
-              @cancel="showAreaPicker = false"
-              :columns-placeholder="['请选择省', '请选择市', '请选择区']"
             />
           </van-popup>
         </div>
@@ -263,6 +262,29 @@
         </div>
       </van-swipe-item>
 
+      <!-- 联系方式 -->
+      <van-swipe-item>
+        <div class="setup-card">
+          <div class="card-icon">📱</div>
+          <h2 class="card-title">联系方式</h2>
+          <p class="card-subtitle">请输入你的手机号码</p>
+          <div class="input-container">
+            <van-field
+              v-model="formData.phone"
+              type="tel"
+              label="手机号码"
+              placeholder="请输入手机号码"
+              input-align="center"
+              :rules="[
+                { required: true, message: '请输入手机号码' }, 
+                { validator: phoneValidator, message: '请输入正确的手机号码' }
+              ]"
+              class="setup-input"
+            />
+          </div>
+        </div>
+      </van-swipe-item>
+
       <!-- 简介 -->
       <van-swipe-item>
         <div class="setup-card">
@@ -330,7 +352,7 @@ import lunisolar from 'lunisolar';
 const router = useRouter();
 const swipeRef = ref();
 const currentStep = ref(1);
-const totalSteps = 12;
+const totalSteps = 13;
 const showDatePicker = ref(false);
 const dateValue = ref(new Date());
 
@@ -359,6 +381,7 @@ const formData = ref({
   education: '',
   religion: '',
   mbti: '',
+  phone: '',
   bio: '',
   privateBio: ''
 });
@@ -391,6 +414,12 @@ const formatLunar = (date: Date | null) => {
 // 地区选择确认 - 更新为Vant4格式
 const onAreaConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
   // selectedOptions是一个数组，包含选中的省市区信息
+  // 我的候选词是’‘，如果某个选项为’‘就不join空的，只join前面不为空的
+
+  
+
+
+
   const regionNames = selectedOptions.map(option => option.text).join('-');
   const regionCodes = selectedOptions.map(option => option.value);
   
@@ -434,21 +463,27 @@ const heightValidator = (value: string | number) => {
   return num >= 120 && num <= 240;
 };
 
+const phoneValidator = (value: string) => {
+  const phoneRegex = /^1[3456789]\d{9}$/;
+  return phoneRegex.test(value);
+};
+
 // 计算是否可以继续
 const canProceed = computed(() => {
   switch (currentStep.value) {
     case 1: return formData.value.gender !== '';
     case 2: return formData.value.birthDate !== null;
     case 3: return formData.value.height !== '' && heightValidator(formData.value.height);
-    case 4: return formData.value.weight !== '';
+    case 4: return formData.value.weight !== '' && weightValidator(formData.value.weight);
     case 5: return formData.value.region !== '';
     case 6: return formData.value.occupation !== '';
     case 7: return formData.value.income !== '';
     case 8: return formData.value.education !== '';
     case 9: return true; // 信仰可选
-    case 10: return formData.value.mbti !== '';
-    case 11: return formData.value.bio.trim() !== '';
-    case 12: return true; // 隐私简介可选
+    case 10: return true; // MBTI可选
+    case 11: return formData.value.phone !== '' && phoneValidator(formData.value.phone); // 手机号必填且格式正确
+    case 12: return true; // 简介可选
+    case 13: return true; // 隐私简介可选
     default: return false;
   }
 });

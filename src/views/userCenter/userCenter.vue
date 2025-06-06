@@ -32,7 +32,7 @@
         <div class="menu-card">
           <h2 class="section-title">管理</h2>
           <div class="menu-items">
-            <div class="menu-item">菜单项1</div>
+            <div class="menu-item" @click="router.push('/profile-setup')">资料维护</div>
             <div class="menu-item">菜单项2</div>
             <div class="menu-item">菜单项3</div>
           </div>

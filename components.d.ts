@@ -15,14 +15,9 @@ declare module 'vue' {
     TIcon: typeof import('tdesign-vue-next')['Icon']
     VanArea: typeof import('vant/es')['Area']
     VanButton: typeof import('vant/es')['Button']
-    VanCalendar: typeof import('vant/es')['Calendar']
     VanCollapse: typeof import('vant/es')['Collapse']
     VanCollapseItem: typeof import('vant/es')['CollapseItem']
     VanDatePicker: typeof import('vant/es')['DatePicker']
-    VanDateTime: typeof import('vant/es')['DateTime']
-    VanDatetimePicker: typeof import('vant/es')['DatetimePicker']
-    VanDropdownItem: typeof import('vant/es')['DropdownItem']
-    VanDropdownMenu: typeof import('vant/es')['DropdownMenu']
     VanField: typeof import('vant/es')['Field']
     VanForm: typeof import('vant/es')['Form']
     VanIcon: typeof import('vant/es')['Icon']
@@ -34,6 +29,5 @@ declare module 'vue' {
     VanSwipeItem: typeof import('vant/es')['SwipeItem']
     VanTabbar: typeof import('vant/es')['Tabbar']
     VanTabbarItem: typeof import('vant/es')['TabbarItem']
-    VanTimePicker: typeof import('vant/es')['TimePicker']
   }
 }
