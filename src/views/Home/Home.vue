@@ -147,8 +147,9 @@ const wechatStore = useWechatStore()
 const isLoading = ref(true)
 const authError = ref<string | null>(null)
 
-// 配置axios基础URL
+// 配置axios基础URL - 添加test.py服务的URL
 axios.defaults.baseURL = 'http://localhost:8080'
+const wechatApiBase = 'http://localhost:8081'  // test.py服务的URL
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -199,13 +200,108 @@ const goToDetail = (id: number) => {
   router.push(`/detail/${id}`);
 };
 
+// 获取URL参数
+const getUrlParam = (name: string): string | null => {
+  const urlParams = new URLSearchParams(window.location.search)
+  return urlParams.get(name)
+}
+
+// 微信授权相关函数
+const initWechatAuth = async () => {
+  try {
+    // 检查URL中是否有微信授权返回的code
+    const code = getUrlParam('code')
+    
+    if (code) {
+      // 如果有code，说明是从微信授权页面返回的
+      console.log('检测到微信授权code:', code)
+      await getUserInfoFromCode(code)
+    } else {
+      // 如果没有code，检查是否在微信环境中
+      if (isWechatBrowser()) {
+        // 在微信环境中，跳转到授权页面
+        await redirectToWechatAuth()
+      } else {
+        // 不在微信环境中，使用测试数据或显示提示
+        console.log('不在微信环境中，使用测试模式')
+        authError.value = '请在微信中打开此页面'
+        isLoading.value = false
+      }
+    }
+  } catch (error: any) {
+    console.error('微信授权初始化失败:', error)
+    authError.value = '微信授权失败: ' + error.message
+    isLoading.value = false
+  }
+}
+
+// 检查是否在微信浏览器中
+const isWechatBrowser = (): boolean => {
+  const ua = navigator.userAgent.toLowerCase()
+  return ua.includes('micromessenger')
+}
+
+// 跳转到微信授权页面
+const redirectToWechatAuth = async () => {
+  try {
+    const currentUrl = window.location.href.split('?')[0] // 去掉现有参数
+    const response = await axios.get(`${wechatApiBase}/wechat/auth_url`, {
+      params: {
+        redirect_uri: currentUrl
+      }
+    })
+    
+    if (response.data.auth_url) {
+      // 跳转到微信授权页面
+      window.location.href = response.data.auth_url
+    } else {
+      throw new Error('获取授权URL失败')
+    }
+  } catch (error: any) {
+    console.error('获取微信授权URL失败:', error)
+    authError.value = '获取微信授权URL失败'
+    isLoading.value = false
+  }
+}
+
+// 通过code获取用户信息
+const getUserInfoFromCode = async (code: string) => {
+  try {
+    const response = await axios.get(`${wechatApiBase}/wechat/user_info`, {
+      params: { code }
+    })
+    
+    const userInfo = response.data
+    console.log('获取到用户信息:', userInfo)
+    
+    // 存储用户信息到store
+    wechatStore.setUserInfo(userInfo)
+    
+    // 可以在这里调用原有的认证逻辑
+    if (userInfo.openid) {
+      const success = await wechatStore.authenticate(userInfo.openid)
+      if (!success) {
+        authError.value = wechatStore.error || '认证失败'
+      }
+    }
+    
+    isLoading.value = false
+    
+  } catch (error: any) {
+    console.error('获取用户信息失败:', error)
+    authError.value = '获取用户信息失败: ' + error.message
+    isLoading.value = false
+  }
+}
+
 // 重试认证
 const retryAuth = async () => {
   authError.value = null
-  await initializeAuth()
+  isLoading.value = true
+  await initWechatAuth()
 }
 
-// 初始化认证
+// 初始化认证 - 修改为使用微信授权
 const initializeAuth = async () => {
   isLoading.value = true
   authError.value = null
@@ -219,28 +315,12 @@ const initializeAuth = async () => {
       return
     }
 
-    // 如果没有有效token，尝试从URL获取openid
-    const openid = wechatStore.getOpenidFromUrl()
-    
-    if (!openid) {
-      // 在实际环境中，这里应该重定向到微信授权页面
-      // 测试环境下，我们可以使用一个测试openid
-      authError.value = '未获取到openid，请通过微信访问'
-      isLoading.value = false
-      return
-    }
-
-    // 使用openid进行认证
-    const success = await wechatStore.authenticate(openid)
-    
-    if (!success) {
-      authError.value = wechatStore.error || '认证失败'
-    }
+    // 如果没有有效token，启动微信授权流程
+    await initWechatAuth()
 
   } catch (error: any) {
     console.error('初始化认证失败:', error)
     authError.value = '网络错误，请检查网络连接'
-  } finally {
     isLoading.value = false
   }
 }
@@ -392,121 +472,6 @@ onMounted(async () => {
   min-height: calc(100vh - 92px);
 }
 
-/* ... existing code ... */
-
-body {
-  background-color: #F2EEE8;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  background-color: #F2EEE8;
-}
-
-.search-container {
-  margin-bottom: 16px;
-  position: relative;
-  z-index: 10;
-  background-color: #F2EEE8;
-}
-
-.search-card {
-  background-color: #EBE3D7;
-  border-radius: 50px;
-  padding: 12px 16px;
-  transition: all 0.3s ease;
-  position: relative;
-  z-index: 10;
-}
-
-.search-card.focused {
-  border-radius: 12px;
-  padding-bottom: 16px;
-  position: absolute;
-  width: calc(100% - 32px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.search-input {
-  border: none;
-  background: transparent;
-  outline: none;
-  width: 100%;
-  font-family: "Microsoft YaHei", sans-serif;
-  font-size: 14px;
-}
-
-.search-options {
-  margin-top: 12px;
-  animation: fadeIn 0.3s ease;
-}
-
-.search-option-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.option-label {
-  width: 60px;
-  font-size: 14px;
-  color: #6A6A6A;
-}
-
-.option-input {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.option-input input {
-  width: 100%;
-  background: #fff;
-  border: none;
-  border-radius: 16px;
-  padding: 8px 32px 8px 12px;
-  font-size: 14px;
-  outline: none;
-}
-
-.clear-icon {
-  position: absolute;
-  right: 8px;
-  color: #ccc;
-  font-size: 16px;
-}
-
-.search-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 5;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ... existing code ... */
-
 .news-section {
   margin-bottom: 24px;
 }
@@ -646,3 +611,113 @@ html {
   color: #ff4757;
 }
 </style>
+body {
+  background-color: #F2EEE8;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background-color: #F2EEE8;
+}
+
+.search-container {
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 10;
+  background-color: #F2EEE8;
+}
+
+.search-card {
+  background-color: #EBE3D7;
+  border-radius: 50px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 10;
+}
+
+.search-card.focused {
+  border-radius: 12px;
+  padding-bottom: 16px;
+  position: absolute;
+  width: calc(100% - 32px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-family: "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+}
+
+.search-options {
+  margin-top: 12px;
+  animation: fadeIn 0.3s ease;
+}
+
+.search-option-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.option-label {
+  width: 60px;
+  font-size: 14px;
+  color: #6A6A6A;
+}
+
+.option-input {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.option-input input {
+  width: 100%;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  padding: 8px 32px 8px 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+.clear-icon {
+  position: absolute;
+  right: 8px;
+  color: #ccc;
+  font-size: 16px;
+}
+
+.search-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 5;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
