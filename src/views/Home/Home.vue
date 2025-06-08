@@ -245,8 +245,75 @@ const initializeAuth = async () => {
   }
 }
 
+const loading = ref(true)
+const error = ref(null)
+const showManualBtn = ref(false)
+
+
+const triggerWechatLogin = () => {
+  loading.value = true
+  error.value = null
+  
+  const appId = import.meta.env.VITE_WECHAT_APPID || 'wxc3d4a60a6dc54cdf'
+  const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://c7850f0.r11.cpolar.top'
+  const redirectUri = encodeURIComponent(`${backendUrl}/api/wechat/callback`)
+  const state = 'YOUR_STATE_' + Math.random().toString(36).substring(2, 8) // 随机state防CSRF
+  
+  // 构造授权URL
+  const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
+  
+  // 跳转微信授权页
+  window.location.href = authUrl
+}
+
+// 检查URL中是否有微信回调的code（适用于回调到前端页面的情况）
+const checkWechatCallback = () => {
+  const query = new URLSearchParams(window.location.search)
+  const code = query.get('code')
+  const state = query.get('state')
+  
+  if (code) {
+    // 如果有code，发送到后端获取openid
+    // 确保code和state不为null后再传入
+    if (code && state) {
+      fetchOpenId(code, state)
+    }
+  }
+}
+
+// 获取openid
+const fetchOpenId = async (code: string, state: string) => {
+  try {
+    const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://你的后端域名'
+    const response = await fetch(`${backendUrl}/api/wechat/auth?code=${code}&state=${state}`)
+    const data = await response.json()
+    
+    if (data.openid) {
+      // 登录成功，处理openid
+      console.log('获取到openid:', data.openid)
+      // 存储到本地或vuex/pinia
+      localStorage.setItem('wechat_openid', data.openid)
+      // 跳转到首页或其他页面
+      router.push('/')
+    } else {
+      throw new Error(data.errmsg || '获取openid失败')
+    }
+  } catch (err:any) {
+    error.value = err.message
+    showManualBtn.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
 onMounted(async () => {
-  await initializeAuth()
+  await initializeAuth();
+  checkWechatCallback()
+  
+  // 如果不是回调页面，直接触发登录
+  if (!window.location.search.includes('code=')) {
+    triggerWechatLogin()
+  }
 })
 </script>
 

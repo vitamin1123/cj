@@ -200,7 +200,7 @@ def save_or_update_wechat_user(session: Session, user_info: dict) -> WechatUser:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动时创建数据库表
-    create_db_and_tables()
+    # create_db_and_tables()
     yield
     # 关闭时的清理工作
 
@@ -465,7 +465,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8080,
+        port=80,
         reload=True,
         workers=1,
         loop="uvloop",
