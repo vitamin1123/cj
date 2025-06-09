@@ -55,17 +55,21 @@ async def verify_wechat(
     else:
         raise HTTPException(status_code=403, detail="Invalid signature")
 
-
+@app.get("/api/wechat/callback")
+async def wechat_callback(code: str, state: str = None):
+    """微信授权回调接口"""
+    # 验证state
+    # if state != EXPECTED_STATE:
+    #     raise HTTPException(status_code=403, detail="Invalid state")
+    
+    # 使用code获取openid
+    return await wechat_auth(code, state)
 
 @app.get("/api/wechat/auth")
 async def wechat_auth(code: str, state: str = None):
     """前端通过code获取openid"""
     if not code:
         raise HTTPException(status_code=400, detail="缺少授权码")
-    
-    # 验证state防止CSRF（生产环境必须）
-    # if state != EXPECTED_STATE:
-    #     raise HTTPException(status_code=403, detail="无效的state参数")
     
     # 向微信服务器请求access_token
     token_url = (

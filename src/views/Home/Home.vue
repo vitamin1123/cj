@@ -148,7 +148,7 @@ const isLoading = ref(true)
 const authError = ref<string | null>(null)
 
 // 配置axios基础URL
-axios.defaults.baseURL = 'http://localhost:8080'
+axios.defaults.baseURL = 'http://6987dc4d.r11.cpolar.top'
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -246,7 +246,7 @@ const initializeAuth = async () => {
 }
 
 const loading = ref(true)
-const error = ref(null)
+const error = ref<string | null>(null)
 const showManualBtn = ref(false)
 
 
@@ -255,12 +255,21 @@ const triggerWechatLogin = () => {
   error.value = null
   
   const appId = import.meta.env.VITE_WECHAT_APPID || 'wxc3d4a60a6dc54cdf'
-  const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://c7850f0.r11.cpolar.top'
-  const redirectUri = encodeURIComponent(`${backendUrl}/api/wechat/callback`)
-  const state = 'YOUR_STATE_' + Math.random().toString(36).substring(2, 8) // 随机state防CSRF
+  // 确保使用正确的后端URL
+  // const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://6987dc4d.r11.cpolar.top'
+  const backendUrl = 'http://6987dc4d.r11.cpolar.top'
   
-  // 构造授权URL
+  // 确保回调地址是后端接口，且不包含端口号（微信要求）
+  const redirectUri = encodeURIComponent(`${backendUrl}/api/wechat/callback`)
+  
+  // 生成state
+  const state = 'STATE_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8)
+  
+  // 构造授权URL - 确保使用正确的scope和格式
   const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
+  
+  // 存储state用于后续验证
+  localStorage.setItem('wechat_auth_state', state)
   
   // 跳转微信授权页
   window.location.href = authUrl
@@ -272,19 +281,26 @@ const checkWechatCallback = () => {
   const code = query.get('code')
   const state = query.get('state')
   
-  if (code) {
-    // 如果有code，发送到后端获取openid
-    // 确保code和state不为null后再传入
-    if (code && state) {
-      fetchOpenId(code, state)
-    }
+  // 验证state防止CSRF
+  const savedState = localStorage.getItem('wechat_auth_state')
+  if (state && savedState !== state) {
+
+    error.value = '无效的授权请求' as string | null
+    showManualBtn.value = true
+    return
+  }
+  
+  if (code && state) {
+    fetchOpenId(code, state)
+    // 清除URL中的code和state参数
+    window.history.replaceState({}, document.title, window.location.pathname)
   }
 }
 
 // 获取openid
 const fetchOpenId = async (code: string, state: string) => {
   try {
-    const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://你的后端域名'
+    const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://6987dc4d.r11.cpolar.top'
     const response = await fetch(`${backendUrl}/api/wechat/auth?code=${code}&state=${state}`)
     const data = await response.json()
     

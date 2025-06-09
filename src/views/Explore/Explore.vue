@@ -86,7 +86,7 @@ import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Toast } from 'vant';
-import { match } from 'pinyin-match';
+import PinyinMatch from 'pinyin-match';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -133,7 +133,7 @@ const handleSearch = () => {
         person.mbti || ''
       ].join(' ');
       
-      return match(searchFields, searchKeyword.value.trim());
+      return PinyinMatch.match(searchFields, searchKeyword.value.trim());
     });
   }
   
@@ -150,7 +150,7 @@ const handleSearch = () => {
   // 区域筛选
   if (regionFilter.value.trim()) {
     filtered = filtered.filter(person => 
-      match(person.region || '', regionFilter.value.trim())
+    PinyinMatch.match(person.region || '', regionFilter.value.trim())
     );
   }
   
@@ -172,7 +172,7 @@ const handleSearch = () => {
 const highlightText = (text, keyword) => {
   if (!text || !keyword.trim()) return text;
   
-  const matchResult = match(text, keyword.trim());
+  const matchResult = PinyinMatch.match(text, keyword.trim());
   if (!matchResult) return text;
   
   // 简单的高亮实现
