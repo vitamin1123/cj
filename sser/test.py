@@ -21,39 +21,42 @@ app.add_middleware(
 
 # 配置微信测试号信息
 WECHAT_CONFIG = {
-    "appid": "wxc3d4a60a6dc54cdf",
-    "secret": "2b154ea94a9d9cb0ab7f3fe104336f1b",
+    "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
+    "secret": "f50e7a202c919ec681ed82b79598673b",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
 # 微信公众号配置信息（需从测试号管理页面获取）
-WECHAT_TOKEN = "1234"
+# WECHAT_TOKEN = "1234" # 由于您提到不再需要token，此行已注释
 
 @app.get("/")
 async def verify_wechat(
-    signature: str,
-    timestamp: str,
-    nonce: str,
-    echostr: str,
+    signature: Optional[str] = None,  # 改为可选参数
+    timestamp: Optional[str] = None,  # 改为可选参数
+    nonce: Optional[str] = None,      # 改为可选参数
+    echostr: Optional[str] = None,    # 改为可选参数
 ):
     """
     微信服务器验证接口
-    1. 校验 signature 是否合法
-    2. 如果合法，返回 echostr
+    原有的签名校验逻辑已注释掉，因为正式账号通常在微信后台配置URL和Token完成验证。
+    如果微信服务器仍会调用此接口进行验证，它现在会直接返回echostr。
     """
     # 1. 将 token、timestamp、nonce 按字典序排序
-    params = sorted([WECHAT_TOKEN, timestamp, nonce])
+    # params = sorted([WECHAT_TOKEN, timestamp, nonce])
     
     # 2. 拼接字符串并 SHA1 加密
-    param_str = "".join(params).encode("utf-8")
-    calculated_signature = hashlib.sha1(param_str).hexdigest()
+    # param_str = "".join(params).encode("utf-8")
+    # calculated_signature = hashlib.sha1(param_str).hexdigest()
     
     # 3. 校验签名
-    if calculated_signature == signature:
-        # 必须返回 text/html 格式，否则微信会报 token check fail:cite[2]
+    # if calculated_signature == signature:
+    #     # 必须返回 text/html 格式，否则微信会报 token check fail:cite[2]
+    #     return Response(content=echostr, media_type="text/html; charset=utf-8")
+    # else:
+    #     raise HTTPException(status_code=403, detail="Invalid signature")
+    if echostr:
         return Response(content=echostr, media_type="text/html; charset=utf-8")
-    else:
-        raise HTTPException(status_code=403, detail="Invalid signature")
+    return {"message": "WeChat verification endpoint. Signature check is disabled."}
 
 @app.get("/api/wechat/callback")
 async def wechat_callback(code: str, state: str = None):

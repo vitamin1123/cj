@@ -148,7 +148,7 @@ const isLoading = ref(true)
 const authError = ref<string | null>(null)
 
 // 配置axios基础URL
-axios.defaults.baseURL = 'http://6987dc4d.r11.cpolar.top'
+axios.defaults.baseURL = 'http://www.tianshunchenjie.com'
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -254,10 +254,10 @@ const triggerWechatLogin = () => {
   loading.value = true
   error.value = null
   
-  const appId = import.meta.env.VITE_WECHAT_APPID || 'wxc3d4a60a6dc54cdf'
+  const appId = 'wxccbf0238cab0a75c'
   // 确保使用正确的后端URL
   // const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://6987dc4d.r11.cpolar.top'
-  const backendUrl = 'http://6987dc4d.r11.cpolar.top'
+  const backendUrl = 'http://www.tianshunchenjie.com'
   
   // 确保回调地址是后端接口，且不包含端口号（微信要求）
   const redirectUri = encodeURIComponent(`${backendUrl}/api/wechat/callback`)
@@ -300,7 +300,7 @@ const checkWechatCallback = () => {
 // 获取openid
 const fetchOpenId = async (code: string, state: string) => {
   try {
-    const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://6987dc4d.r11.cpolar.top'
+    const backendUrl = 'http://www.tianshunchenjie.com'
     const response = await fetch(`${backendUrl}/api/wechat/auth?code=${code}&state=${state}`)
     const data = await response.json()
     
