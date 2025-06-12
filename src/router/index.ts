@@ -1,152 +1,139 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import Result404 from '@/views/NotFound404View/NotFound404View.vue'
-
-import IndexView from '@/views/IndexView/IndexView.vue'
-import HomeView from '@/views/Home/Home.vue'
-import userCenterView from '@/views/userCenter/userCenter.vue'
-import { useAuthStore } from '@/store/authStore'
-import DetailView from '@/views/Detail/Detail.vue'
-import ExploreView from '@/views/Explore/Explore.vue'
-import LikesView from '@/views/Likes/Likes.vue'
+import { useWechatStore } from '@/store/wechatStore'
+import axios from 'axios'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-
+    // 关键修改：简化/auth-success路由，只做跳转处理
+    {
+      path: '/auth-success',
+      name: 'auth-success',
+      component: {
+        template: '<div style="padding: 20px; text-align: center;">授权成功，跳转中...</div>'
+      },
+      beforeEnter: (to, from, next) => {
+        const openid = to.query.openid as string
+        if (openid) {
+          // 立即保存openid到store和localStorage
+          const wechatStore = useWechatStore()
+          wechatStore.setOpenid(openid)
+          // localStorage.setItem('wechat_openid', openid)
+          
+          // 强制跳转到/home，使用replace避免历史记录问题
+          next({ path: '/home', replace: true })
+        } else {
+          // 没有openid时强制跳转到提示页
+          next({ path: '/reopen', replace: true })
+        }
+      }
+    },
     {
       path: '/404',
       name: '404',
       component: Result404,
-      meta: {
-        title: '404' // 自定义标题
-      }
+      meta: { title: '404' }
     },
-    
-  
-    
     {
       path: '/',
       name: 'index',
-      component: HomeView,
-      meta: {
-        title: '首页' // 自定义标题
-      }
+      redirect: '/home' // 根路径直接重定向到home
     },
     {
       path: '/home',
       name: 'home',
-      component: HomeView,
-      meta: {
-        title: '扉页' // 自定义标题
-      }
+      component: () => import('@/views/Home/Home.vue'),
+      meta: { title: '首页' }
     },
     {
       path: '/userCenter',
       name: 'userCenter',
-      component: userCenterView,
-      meta: {
-        title: '个人中心' // 自定义标题
-      }
+      component: () => import('@/views/userCenter/userCenter.vue'),
+      meta: { title: '个人中心' }
     },
-    // HomeView
-    // 在routes数组中添加新路由
     {
       path: '/detail/:id',
       name: 'detail',
-      component: DetailView,
-      meta: {
-        title: '详细信息'
-      }
+      component: () => import('@/views/Detail/Detail.vue'),
+      meta: { title: '详细信息' }
     },
     {
       path: '/explore',
       name: 'explore',
-      component: ExploreView,
-      meta: {
-        title: '寻觅'
-      }
+      component: () => import('@/views/Explore/Explore.vue'),
+      meta: { title: '寻觅' }
     },
     {
       path: '/likes',
       name: 'likes',
-      component: LikesView,
-      meta: {
-        title: '喜欢'
-      }
+      component: () => import('@/views/Likes/Likes.vue'),
+      meta: { title: '喜欢' }
     },
     {
       path: '/profile-setup',
       name: 'ProfileSetup',
       component: () => import('@/views/ProfileSetup/ProfileSetup.vue')
+    },
+    {
+      path: '/reopen',
+      name: 'reopen',
+      component: () => import('@/views/ReopenPage/ReopenPage.vue'),
+      meta: { title: '请在微信中打开' }
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/404'
     }
-  ],
+  ]
 })
 
-// 路由守卫
+// 配置axios基础URL
+axios.defaults.baseURL = 'http://www.tianshunchenjie.com'
+
+// 微信授权相关函数 - 确保立即跳转
+const triggerWechatLogin = () => {
+  const appId = 'wxccbf0238cab0a75c'
+  const backendUrl = 'http://www.tianshunchenjie.com'
+  const redirectUri = encodeURIComponent(`${backendUrl}/api/wechat/callback`)
+  const state = 'STATE_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8)
+  
+  const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
+  
+  localStorage.setItem('wechat_auth_state', state)
+  
+  // 立即跳转，不等待
+  window.location.href = authUrl
+}
+
+// 路由守卫 - 只处理openid检查
 router.beforeEach((to, from, next) => {
-  // document.title = to.meta.title || '自助功能'
+  // 设置页面标题
   document.title = (to.meta?.title as string) ?? '自助功能'
-  const authStore = useAuthStore()
-
-  // 从 URL 中提取 token 参数
-  const tokenFromQuery = Array.isArray(to.query.token) ? to.query.token[0] : to.query.token
-
-  // 如果 URL 中有 token 并且 authStore 没有保存 token，则存储 token 并移除 URL 中的 token 参数
-  if (tokenFromQuery && tokenFromQuery !== authStore.token) {
-    authStore.setToken(tokenFromQuery)
-
-    // 移除 token 参数
-    const { token, ...queryWithoutToken } = to.query
-    return next({ path: to.path, query: queryWithoutToken, replace: true })
+  
+  // 特殊路径直接放行
+  if (to.path === '/reopen' || to.path === '/auth-success' || to.path === '/404') {
+    return next()
   }
 
-  // 如果没有 token 并且 authStore 中也没有 token，重定向到 404
-  // if (!tokenFromQuery && !authStore.token) {
-  //   console.log('确实没有token')
-  //   if (to.path === '/login' || to.path === '/404') {
-  //     return next()
-  //   }
-  //   // return next({ path: '/404' })
-  //   // 根据 vismem 参数判断跳转方向
-  //   if (to.path === '/vismem') {
-  //     return next({ path: '/404' })
-  //   } else {
-  //     return next({ path: '/login' })
-  //   }
-  // }
+  // 检查是否有openid
+  const storedOpenid = localStorage.getItem('wechat_openid')
+  if (!storedOpenid) {
+    // 检查是否在微信环境中
+    const isWechat = /micromessenger/i.test(navigator.userAgent)
+    
+    if (!isWechat) {
+      // 不在微信环境，跳转到重新打开页面
+      return next({ path: '/reopen', replace: true })
+    } else {
+      // 在微信环境但没有openid，立即触发授权
+      triggerWechatLogin()
+      return // 停止后续处理
+    }
+  }
 
   next()
 })
-
-// router.beforeEach((to, from, next) => {
-//   const authStore = useAuthStore()
-
-//   // 从 URL 中获取 token，并确保它是 string 类型
-//   const token_tp = Array.isArray(to.query.token) ? to.query.token[0] : to.query.token
-//   console.log("看看有没有token", token_tp, authStore.token,token_tp!==authStore.token)
-
-//   // 如果 URL 中没有 token 并且 authStore 也没有 token，重定向到 /404
-//   if (!token_tp && !authStore.token && to.path !== '/404') {
-//     return next({ path: '/404' })
-//   }
-
-//   // 如果 URL 中有 token 且 authStore 中没有存储 token，则进行 token 处理
-//   if (typeof token_tp === 'string' && token_tp && (!authStore.token || token_tp!== authStore.token)) {
-//     authStore.setToken(token_tp)
-//     console.log('authStore写入成功')
-
-//     // 移除 URL 中的 token 参数，避免暴露
-//     const { token , ...queryWithoutToken } = to.query
-
-//     return next({ ...to, query: queryWithoutToken, replace: true })
-//   }
-
-//   // 如果 URL 没有 token，但 authStore 已经有 token，则直接放行
-//   next()
-// })
-
-
-
 
 export default router

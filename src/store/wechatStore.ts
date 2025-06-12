@@ -1,3 +1,4 @@
+// src/store/wechatStore.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
@@ -13,9 +14,21 @@ interface WechatUser {
 
 export const useWechatStore = defineStore('wechat', () => {
   const user = ref<WechatUser | null>(null)
-  const token = ref<string | null>(localStorage.getItem('wechat_token'))
+  const token = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  // 初始化时尝试从本地存储加载
+  function initializeFromStorage() {
+    const storedToken = localStorage.getItem('wechat_token')
+    if (storedToken) {
+      token.value = storedToken
+      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+    }
+  }
+
+  // 调用初始化
+  initializeFromStorage()
 
   // 设置token
   function setToken(newToken: string) {
@@ -37,9 +50,28 @@ export const useWechatStore = defineStore('wechat', () => {
     user.value = userInfo
   }
 
+  // 新增：设置openid方法
+  function setOpenid(openid: string) {
+    if (user.value) {
+      // 如果已有用户数据，更新openid
+      user.value.openid = openid
+    } else {
+      // 创建基础用户对象
+      user.value = {
+        openid,
+        subscribe: 0, // 默认值
+        created_at: new Date().toISOString() // 当前时间
+      }
+    }
+    
+    // 单独存储openid以备其他用途
+    localStorage.setItem('wechat_openid', openid)
+  }
+
   // 清除用户信息
   function clearUser() {
     user.value = null
+    localStorage.removeItem('wechat_openid')
   }
 
   // 从URL获取openid（微信网页授权后会在URL中）
@@ -136,6 +168,7 @@ export const useWechatStore = defineStore('wechat', () => {
     setToken,
     clearToken,
     setUser,
+    setOpenid,
     clearUser,
     getOpenidFromUrl,
     authenticate,
@@ -146,8 +179,13 @@ export const useWechatStore = defineStore('wechat', () => {
   }
 }, {
   persist: {
-    key: 'wechat-store',
-    storage: localStorage,
-    paths: ['user']
+    enabled: true,
+    strategies: [
+      {
+        key: 'wechat-store',
+        storage: localStorage,
+        paths: ['user']
+      }
+    ]
   }
 })

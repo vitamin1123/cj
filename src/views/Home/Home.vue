@@ -112,7 +112,6 @@
 
     <!-- 底部TabBar -->
     <TabBar 
-      v-if="!isLoading && !authError"
       :active-tab="activeTab" 
       @update:active-tab="activeTab = $event"
       :tabs="tabs"
@@ -121,12 +120,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router'
-import { useWechatStore } from '@/store/wechatStore'
-import { Toast } from 'vant'
-import axios from 'axios'
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -141,14 +137,6 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const activeTab = ref('home');
 const router = useRouter()
 const isSearchFocused = ref(false);
-const wechatStore = useWechatStore()
-
-// 加载和错误状态
-const isLoading = ref(true)
-const authError = ref<string | null>(null)
-
-// 配置axios基础URL
-axios.defaults.baseURL = 'http://www.tianshunchenjie.com'
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -198,139 +186,6 @@ const handleTabClick = (tab: any) => {
 const goToDetail = (id: number) => {
   router.push(`/detail/${id}`);
 };
-
-// 重试认证
-const retryAuth = async () => {
-  authError.value = null
-  await initializeAuth()
-}
-
-// 初始化认证
-const initializeAuth = async () => {
-  isLoading.value = true
-  authError.value = null
-
-  try {
-    // 首先尝试使用已存储的token
-    const hasValidToken = await wechatStore.initialize()
-    
-    if (hasValidToken) {
-      isLoading.value = false
-      return
-    }
-
-    // 如果没有有效token，尝试从URL获取openid
-    const openid = wechatStore.getOpenidFromUrl()
-    
-    if (!openid) {
-      // 在实际环境中，这里应该重定向到微信授权页面
-      // 测试环境下，我们可以使用一个测试openid
-      authError.value = '未获取到openid，请通过微信访问'
-      isLoading.value = false
-      return
-    }
-
-    // 使用openid进行认证
-    const success = await wechatStore.authenticate(openid)
-    
-    if (!success) {
-      authError.value = wechatStore.error || '认证失败'
-    }
-
-  } catch (error: any) {
-    console.error('初始化认证失败:', error)
-    authError.value = '网络错误，请检查网络连接'
-  } finally {
-    isLoading.value = false
-  }
-}
-
-const loading = ref(true)
-const error = ref<string | null>(null)
-const showManualBtn = ref(false)
-
-
-const triggerWechatLogin = () => {
-  loading.value = true
-  error.value = null
-  
-  const appId = 'wxccbf0238cab0a75c'
-  // 确保使用正确的后端URL
-  // const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://6987dc4d.r11.cpolar.top'
-  const backendUrl = 'http://www.tianshunchenjie.com'
-  
-  // 确保回调地址是后端接口，且不包含端口号（微信要求）
-  const redirectUri = encodeURIComponent(`${backendUrl}/api/wechat/callback`)
-  
-  // 生成state
-  const state = 'STATE_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8)
-  
-  // 构造授权URL - 确保使用正确的scope和格式
-  const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
-  
-  // 存储state用于后续验证
-  localStorage.setItem('wechat_auth_state', state)
-  
-  // 跳转微信授权页
-  window.location.href = authUrl
-}
-
-// 检查URL中是否有微信回调的code（适用于回调到前端页面的情况）
-const checkWechatCallback = () => {
-  const query = new URLSearchParams(window.location.search)
-  const code = query.get('code')
-  const state = query.get('state')
-  
-  // 验证state防止CSRF
-  const savedState = localStorage.getItem('wechat_auth_state')
-  if (state && savedState !== state) {
-
-    error.value = '无效的授权请求' as string | null
-    showManualBtn.value = true
-    return
-  }
-  
-  if (code && state) {
-    fetchOpenId(code, state)
-    // 清除URL中的code和state参数
-    window.history.replaceState({}, document.title, window.location.pathname)
-  }
-}
-
-// 获取openid
-const fetchOpenId = async (code: string, state: string) => {
-  try {
-    const backendUrl = 'http://www.tianshunchenjie.com'
-    const response = await fetch(`${backendUrl}/api/wechat/auth?code=${code}&state=${state}`)
-    const data = await response.json()
-    
-    if (data.openid) {
-      // 登录成功，处理openid
-      console.log('获取到openid:', data.openid)
-      // 存储到本地或vuex/pinia
-      localStorage.setItem('wechat_openid', data.openid)
-      // 跳转到首页或其他页面
-      router.push('/')
-    } else {
-      throw new Error(data.errmsg || '获取openid失败')
-    }
-  } catch (err:any) {
-    error.value = err.message
-    showManualBtn.value = true
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(async () => {
-  await initializeAuth();
-  checkWechatCallback()
-  
-  // 如果不是回调页面，直接触发登录
-  if (!window.location.search.includes('code=')) {
-    triggerWechatLogin()
-  }
-})
 </script>
 
 <style scoped>
@@ -475,18 +330,6 @@ onMounted(async () => {
   min-height: calc(100vh - 92px);
 }
 
-/* ... existing code ... */
-
-body {
-  background-color: #F2EEE8;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  background-color: #F2EEE8;
-}
-
 .search-container {
   margin-bottom: 16px;
   position: relative;
@@ -587,8 +430,6 @@ html {
     transform: translateY(0);
   }
 }
-
-/* ... existing code ... */
 
 .news-section {
   margin-bottom: 24px;
