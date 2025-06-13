@@ -85,7 +85,7 @@ import { ref, computed, onMounted } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { Toast } from 'vant';
+import { Toast,showFailToast,showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
 
 // 导入图标
@@ -236,7 +236,7 @@ const loadUserProfiles = async () => {
   try {
     const token = localStorage.getItem('wechat_token');
     if (!token) {
-      Toast.fail('请先登录');
+      showFailToast('请先登录');
       return;
     }
     
@@ -265,7 +265,7 @@ const loadUserProfiles = async () => {
     
   } catch (error) {
     console.error('加载用户数据失败:', error);
-    Toast.fail('加载数据失败');
+    showFailToast('加载数据失败');
   }
 };
 

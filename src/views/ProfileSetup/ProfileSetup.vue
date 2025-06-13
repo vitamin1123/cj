@@ -345,9 +345,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast, Calendar, Popup, Icon, Field } from 'vant';
+import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast,showFailToast,showSuccessToast, Calendar, Popup, Icon, Field } from 'vant';
 import { areaList } from '@vant/area-data';
 import lunisolar from 'lunisolar';
+import apiClient from '@/plugins/axios';
 
 const router = useRouter();
 const swipeRef = ref();
@@ -402,7 +403,7 @@ const onDateConfirm = ({ selectedValues }: { selectedValues: number[] }) => {
 };
 
 const formatSolar = (date: Date | null) => {
-  if (!date) return '请选择出生日期';
+  if (!date) return '请选择日期';
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 };
 
@@ -511,13 +512,43 @@ currentStep.value--;
 
 const submitForm = async () => {
   try {
-    // 这里调用API提交表单数据
-    console.log('提交表单数据:', formData.value);
-    Toast.success('信息保存成功！');
-    router.push('/home');
+    // 将表单数据转换为后端需要的格式
+    const profileData = {
+      gender: formData.value.gender,
+      birth_date: formData.value.birthDate ? (formData.value.birthDate) : null,
+      height: formData.value.height ? parseInt(formData.value.height) : null,
+      weight: formData.value.weight ? parseFloat(formData.value.weight) : null,
+      region_code: formData.value.regionCode,
+      occupation: formData.value.occupation,
+      income_level: formData.value.income,
+      education: formData.value.education,
+      religion: formData.value.religion,
+      mbti: formData.value.mbti,
+      phone: formData.value.phone,
+      mem: formData.value.bio,
+      mem_pri: formData.value.privateBio
+    };
+    
+    // 调用API提交表单数据
+    const response = await apiClient.post('/api/profile', profileData);
+    
+    if (response.status === 200) {
+      showSuccessToast('信息保存成功！');
+      router.push('/home');
+    } else {
+      showFailToast('保存失败，请重试');
+    }
   } catch (error) {
-    Toast.fail('保存失败，请重试');
+    showFailToast('保存失败，请重试');
+    console.error('提交失败:', error);
   }
+};
+
+const formatDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 onMounted(() => {

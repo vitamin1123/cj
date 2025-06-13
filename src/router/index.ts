@@ -2,6 +2,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Result404 from '@/views/NotFound404View/NotFound404View.vue'
 import { useWechatStore } from '@/store/wechatStore'
+import { useAuthStore } from '@/store/authStore'
 import axios from 'axios'
 
 const router = createRouter({
@@ -16,10 +17,13 @@ const router = createRouter({
       },
       beforeEnter: (to, from, next) => {
         const openid = to.query.openid as string
-        if (openid) {
+        const token = to.query.token as string
+        if (openid && token) {
           // 立即保存openid到store和localStorage
           const wechatStore = useWechatStore()
+          const authStore = useAuthStore()
           wechatStore.setOpenid(openid)
+          authStore.setToken(token)
           // localStorage.setItem('wechat_openid', openid)
           
           // 强制跳转到/home，使用replace避免历史记录问题
