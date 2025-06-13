@@ -230,14 +230,23 @@
         <div class="setup-card">
           <div class="card-icon">🙏</div>
           <h2 class="card-title">信仰</h2>
-          <p class="card-subtitle">你的宗教信仰</p>
+          <p class="card-subtitle">你的宗教信仰(可选)</p>
           <div class="input-container">
-            <input 
-              type="text" 
-              v-model="formData.religion" 
-              placeholder="请输入信仰（可选）"
-              class="setup-input"
-            />
+            <van-field
+  v-model="formData.religion"
+  is-link
+  readonly
+  label="宗教信仰"
+  placeholder="请选择"
+  @click="showReligionPicker = true"
+/>
+<van-popup v-model:show="showReligionPicker" position="bottom">
+  <van-picker
+    :columns="religionOptions"
+    @confirm="onReligionConfirm"
+    @cancel="showReligionPicker = false"
+  />
+</van-popup>
           </div>
         </div>
       </van-swipe-item>
@@ -365,7 +374,8 @@ const currentDate = ref([
 const minDate = new Date(1980, 0, 1);
 const maxDate = new Date(2100, 12, 31);
 
-const showAreaPicker = ref(false); // New ref for area picker
+const showAreaPicker = ref(false);
+const showReligionPicker = ref(false);
 // 直接使用导入的areaList数据
 
 // 表单数据
@@ -412,6 +422,11 @@ const formatLunar = (date: Date | null) => {
 };
 
 // 地区选择确认 - 更新为Vant4格式
+const onReligionConfirm = ({ selectedOptions }) => {
+  formData.value.religion = selectedOptions[0].text;
+  showReligionPicker.value = false;
+};
+
 const onAreaConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
   // selectedOptions是一个数组，包含选中的省市区信息
   // 我的候选词是’‘，如果某个选项为’‘就不join空的，只join前面不为空的
@@ -451,6 +466,15 @@ const mbtiOptions = [
   'INFJ', 'INFP', 'ENFJ', 'ENFP',
   'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
   'ISTP', 'ISFP', 'ESTP', 'ESFP'
+];
+
+const religionOptions = [
+  { text: '佛教', value: 'buddhism' },
+  { text: '基督教', value: 'christianity' },
+  { text: '伊斯兰教', value: 'islam' },
+  { text: '道教', value: 'taoism' },
+  { text: '无宗教信仰', value: 'none' },
+  { text: '其他', value: 'other' }
 ];
 
 // 身高输入格式化器
