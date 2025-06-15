@@ -358,9 +358,9 @@ const showDatePicker = ref(false);
 const dateValue = ref(new Date());
 
 const currentDate = ref([
-  new Date().getFullYear(),
-  new Date().getMonth() + 1,
-  new Date().getDate()
+  (new Date().getFullYear()).toString(),
+  (new Date().getMonth() + 1).toString(),
+  (new Date().getDate()).toString()
 ]);
 
 const minDate = new Date(1980, 0, 1);
@@ -372,7 +372,7 @@ const showAreaPicker = ref(false); // New ref for area picker
 // 表单数据
 const formData = ref({
   gender: '',
-  birthDate: null as Date | null,
+  birthDate: new Date(),
   height: '',
   weight: '',
   region: '',
@@ -395,10 +395,12 @@ const weightValidator = (value: string | number) => {
   return Number(value) <= 250;
 };
 
-const onDateConfirm = ({ selectedValues }: { selectedValues: number[] }) => {
-  const [year, month, day] = selectedValues;
-  const selectedDate = new Date(year, month - 1, day);
-  formData.value.birthDate = selectedDate;
+const onDateConfirm = (params:any) => {
+  const { selectedValues } = params;
+  // selectedValues 是 string[], 例如 ['2023', '10', '26']
+  currentDate.value = selectedValues; // 更新 currentDate 以保持 date-picker 的 v-model
+  // 将选择的年月日转换为 Date 对象存储
+  formData.value.birthDate = new Date(parseInt(selectedValues[0]), parseInt(selectedValues[1]) - 1, parseInt(selectedValues[2]));
   showDatePicker.value = false;
 };
 

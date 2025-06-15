@@ -78,6 +78,24 @@ import { ref } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 
+// 定义 LikedPerson 接口
+interface LikedPerson {
+  id: number;
+  name: string;
+  height: number;
+  desc: string;
+  likeTime: string;
+  // 可以添加更多字段，如头像等
+}
+
+// 定义 Filter 接口
+interface Filter {
+  id: number;
+  label: string;
+  value: 'liked' | 'likedBy';
+  active: boolean;
+}
+
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -92,21 +110,21 @@ const activeTab = ref('likes');
 const router = useRouter();
 
 // 添加筛选状态
-const filters = ref([
+const filters = ref<Filter[]>([
   { id: 1, label: '我喜欢的', value: 'liked', active: true },
   { id: 2, label: '喜欢我的', value: 'likedBy', active: false }
 ]);
 
-const activeFilter = ref('liked');
+const activeFilter = ref<'liked' | 'likedBy'>('liked');
 
-const toggleFilter = (filter: any) => {
+const toggleFilter = (filter: Filter) => {
   filters.value.forEach(f => f.active = false);
   filter.active = true;
   activeFilter.value = filter.value;
 };
 
 // 我喜欢的列表数据
-const likedPeople = ref([
+const likedPeople = ref<LikedPerson[]>([
   { 
     id: 2, 
     name: '小雅', 
@@ -124,15 +142,23 @@ const likedPeople = ref([
 ]);
 
 // 添加喜欢我的列表数据
-const likedByPeople = ref([
+const likedByPeople = ref<LikedPerson[]>([
   { id: 7, name: '小明', height: 178, desc: '喜欢运动', likeTime: '1天前' },
   { id: 8, name: '小强', height: 175, desc: '程序员', likeTime: '3天前' }
 ]);
 
-const removeLike = (person: any) => {
-  const index = likedPeople.value.findIndex(p => p.id === person.id);
-  if (index > -1) {
-    likedPeople.value.splice(index, 1);
+const removeLike = (person: LikedPerson) => {
+  // 根据 activeFilter 决定从哪个列表移除
+  if (activeFilter.value === 'liked') {
+    const index = likedPeople.value.findIndex(p => p.id === person.id);
+    if (index > -1) {
+      likedPeople.value.splice(index, 1);
+    }
+  } else if (activeFilter.value === 'likedBy') {
+    const index = likedByPeople.value.findIndex(p => p.id === person.id);
+    if (index > -1) {
+      likedByPeople.value.splice(index, 1);
+    }
   }
 };
 

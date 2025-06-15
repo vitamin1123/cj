@@ -1,7 +1,7 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import Result404 from '@/views/NotFound404View/NotFound404View.vue'
-import { useWechatStore } from '@/store/wechatStore'
+// import { useWechatStore } from '@/store/wechatStore'
 import { useAuthStore } from '@/store/authStore'
 import axios from 'axios'
 
@@ -16,13 +16,13 @@ const router = createRouter({
         template: '<div style="padding: 20px; text-align: center;">授权成功，跳转中...</div>'
       },
       beforeEnter: (to, from, next) => {
-        const openid = to.query.openid as string
+        // const openid = to.query.openid as string
         const token = to.query.token as string
-        if (openid && token) {
+        if ( token) {
           // 立即保存openid到store和localStorage
-          const wechatStore = useWechatStore()
+          
           const authStore = useAuthStore()
-          wechatStore.setOpenid(openid)
+          
           authStore.setToken(token)
           // localStorage.setItem('wechat_openid', openid)
           
