@@ -23,7 +23,7 @@
       <div class="error-icon">⚠️</div>
       <div class="error-title">认证失败</div>
       <div class="error-message">{{ authError }}</div>
-      <button class="retry-button" @click="retryAuth">重试</button>
+      <button class="retry-button">重试</button>
     </div>
 
     <!-- 页面内容 -->
@@ -120,9 +120,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue'; // Import onMounted
 import TabBar from '@/components/TabBar.vue';
-import { useRouter } from 'vue-router'
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/store/authStore'; // Assuming you have an auth store
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -135,8 +136,40 @@ import smileIcon from '@/assets/icons/smile.svg';
 import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 
 const activeTab = ref('home');
-const router = useRouter()
+const router = useRouter();
 const isSearchFocused = ref(false);
+
+// Add missing reactive variables and functions
+const isLoading = ref(true); // Or false, depending on initial state
+const authError = ref<string | null>(null); // To store authentication error messages
+const authStore = useAuthStore();
+
+const checkAuth = async () => {
+  isLoading.value = true;
+  authError.value = null;
+  try {
+    // Example: Check if user is authenticated or fetch initial data
+    // Replace with your actual authentication logic
+    console.log('看看首页的token：',authStore.token); // Assuming your authStore has this action
+    // if (!authStore.isAuthenticated) {
+    //   // authError.value = '用户未登录或会话已过期。';
+    //   // router.push('/login'); // Redirect to login if not authenticated
+    // }
+  } catch (error: any) { // Explicitly type error
+    console.error('Authentication check failed:', error);
+    authError.value = error.message || '认证检查失败，请稍后重试。';
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const retryAuth = () => {
+  checkAuth();
+};
+
+onMounted(() => {
+  checkAuth(); // Check authentication status when component is mounted
+});
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;

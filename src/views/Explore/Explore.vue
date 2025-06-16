@@ -85,8 +85,34 @@ import { ref, computed, onMounted } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { Toast } from 'vant';
+import { Toast,showFailToast,showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
+
+// 定义 Person 接口
+interface Person {
+  id: number; // 或者 string，根据后端返回确定
+  name: string;
+  height: number;
+  gender: 'male' | 'female' | string; // 根据实际情况调整
+  region: string;
+  occupation?: string;
+  education?: string;
+  mbti?: string;
+  bio?: string;
+  liked: boolean;
+  isNew: boolean;
+  // 其他可能的字段
+  [key: string]: any; // 允许其他动态字段，但尽量明确
+}
+
+// 定义 Filter 接口
+interface Filter {
+  id: number;
+  label: string;
+  active: boolean;
+  type: 'location' | 'gender' | 'newbie' | string; // 根据实际情况调整
+  value?: string;
+}
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -106,8 +132,8 @@ const heightFilter = ref('');
 const regionFilter = ref('');
 
 // 两个列表：全部数据和过滤后的数据
-const allPeopleList = ref([]);
-const filteredPeopleList = ref([]);
+const allPeopleList = ref<Person[]>([]);
+const filteredPeopleList = ref<Person[]>([]);
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -133,6 +159,7 @@ const handleSearch = () => {
         person.mbti || ''
       ].join(' ');
       
+      // 确保 PinyinMatch.match 的参数类型正确
       return PinyinMatch.match(searchFields, searchKeyword.value.trim());
     });
   }
@@ -169,19 +196,26 @@ const handleSearch = () => {
 };
 
 // 高亮匹配文本
-const highlightText = (text, keyword) => {
-  if (!text || !keyword.trim()) return text;
+const highlightText = (text: string | undefined, keyword: string): string => {
+  if (!text || !keyword.trim()) return text || '';
   
   const matchResult = PinyinMatch.match(text, keyword.trim());
   if (!matchResult) return text;
   
   // 简单的高亮实现
-  const regex = new RegExp(`(${keyword.trim()})`, 'gi');
-  return text.replace(regex, '<span class="highlight">$1</span>');
+  // 注意: keyword 可能包含正则表达式特殊字符，需要转义，或者使用更安全的高亮库
+  // 为简单起见，这里暂时不处理转义
+  try {
+    const regex = new RegExp(`(${keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.replace(regex, '<span class="highlight">$1</span>');
+  } catch (e) {
+    console.warn('Error creating regex for highlight:', e);
+    return text; // Fallback to original text if regex fails
+  }
 };
 
 // 修改筛选标签 - 支持多选独立模式
-const filters = ref([
+const filters = ref<Filter[]>([
   { id: 1, label: '同城', active: false, type: 'location' },
   { id: 2, label: '只看男', active: false, type: 'gender', value: 'male' },
   { id: 3, label: '只看女', active: false, type: 'gender', value: 'female' },
@@ -189,9 +223,9 @@ const filters = ref([
 ]);
 
 // 性别筛选状态：0-取消选中，1-只看男，2-只看女
-const genderFilterState = ref(0);
+const genderFilterState = ref<0 | 1 | 2>(0);
 
-const toggleFilter = (filter) => {
+const toggleFilter = (filter: Filter) => {
   if (filter.type === 'gender') {
     // 性别筛选的三状态循环逻辑
     if (filter.value === 'male') {
@@ -236,7 +270,7 @@ const loadUserProfiles = async () => {
   try {
     const token = localStorage.getItem('wechat_token');
     if (!token) {
-      Toast.fail('请先登录');
+      showFailToast('请先登录');
       return;
     }
     
@@ -246,7 +280,7 @@ const loadUserProfiles = async () => {
       }
     });
     
-    allPeopleList.value = response.data.map(profile => ({
+    allPeopleList.value = response.data.map((profile: any) => ({
       id: profile.id,
       name: profile.name,
       height: profile.height,
@@ -265,15 +299,15 @@ const loadUserProfiles = async () => {
     
   } catch (error) {
     console.error('加载用户数据失败:', error);
-    Toast.fail('加载数据失败');
+    showFailToast('加载数据失败');
   }
 };
 
-const toggleLike = (person) => {
+const toggleLike = (person: Person) => {
   person.liked = !person.liked;
 };
 
-const goToDetail = (id) => {
+const goToDetail = (id: number | string) => {
   router.push(`/detail/${id}`);
 };
 

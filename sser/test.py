@@ -1,14 +1,23 @@
 from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import uvicorn
 import hashlib
 import hmac
+import jwt
+from sqlmodel import SQLModel, Field, create_engine, Session, select
+from datetime import datetime, timedelta
+from fastapi import Depends, Header
+from pydantic import BaseModel
 from typing import Optional
 
 app = FastAPI()
 
-
+# JWT配置
+JWT_SECRET = "81efd3fc-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
 # 配置CORS
 app.add_middleware(
@@ -25,6 +34,72 @@ WECHAT_CONFIG = {
     "secret": "f50e7a202c919ec681ed82b79598673b",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
+
+# 数据库模型
+class User(SQLModel, table=True):
+    openid: str = Field(primary_key=True)
+    gender: str
+    birth_date: datetime
+    height: int = Field(default=None)
+    weight: float = Field(default=None)
+    region_code: str = Field(default=None)
+    occupation: str = Field(default=None)
+    income_level: str = Field(default=None)
+    education: str = Field(default=None)
+    religion: str = Field(default=None)
+    mbti: str = Field(default=None)
+    phone: str = Field(default=None)
+    mem: str = Field(default=None)
+    mem_pri: str = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
+
+# 数据库连接
+DATABASE_URL = "mysql+pymysql://root:1234%40Qazx@localhost/cj"
+engine = create_engine(DATABASE_URL)
+
+# 用户资料模型
+class ProfileData(BaseModel):
+    gender: str
+    birth_date: str
+    height: Optional[int] = None
+    weight: Optional[float] = None
+    region_code: Optional[str] = None
+    occupation: Optional[str] = None
+    income_level: Optional[str] = None
+    education: Optional[str] = None
+    religion: Optional[str] = None
+    mbti: Optional[str] = None
+    phone: Optional[str] = None
+    mem: Optional[str] = None
+    mem_pri: Optional[str] = None
+
+    # JWT工具函数
+def create_jwt_token(openid: str) -> str:
+    expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRE_MINUTES)
+    payload = {
+        "sub": openid,
+        "exp": expire
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def decode_jwt_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=403, detail="Token 已过期")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=403, detail="无效的 Token")
+
+# 依赖项：验证JWT并获取openid
+async def get_current_user(authorization: str = Header(...)) -> str:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="缺少认证信息")
+    
+    token = authorization.split(" ")[1]
+    payload = decode_jwt_token(token)
+    return payload.get("sub")
 
 # 微信公众号配置信息（需从测试号管理页面获取）
 # WECHAT_TOKEN = "1234" # 由于您提到不再需要token，此行已注释
@@ -58,7 +133,7 @@ async def verify_wechat(
         return Response(content=echostr, media_type="text/html; charset=utf-8")
     return {"message": "WeChat verification endpoint. Signature check is disabled."}
 
-@app.get("/api/wechat/callback")
+@app.get("/wechat/callback")
 async def wechat_callback(code: str, state: str = None):
     """微信授权回调接口"""
     # 验证state
@@ -66,9 +141,14 @@ async def wechat_callback(code: str, state: str = None):
     #     raise HTTPException(status_code=403, detail="Invalid state")
     
     # 使用code获取openid
-    return await wechat_auth(code, state)
+    result = await wechat_auth(code, state)
+    openid = result["openid"]
+    # 生成JWT
+    token = create_jwt_token(openid)
+    redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
+    return RedirectResponse(url=redirect_url)
 
-@app.get("/api/wechat/auth")
+@app.get("/wechat/auth")
 async def wechat_auth(code: str, state: str = None):
     """前端通过code获取openid"""
     if not code:
@@ -101,5 +181,54 @@ async def wechat_auth(code: str, state: str = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# 新增保存资料接口
+@app.post("/profile")
+async def add_profile(
+    profile_data: ProfileData,
+    openid: str = Depends(get_current_user)
+):
+    # 检查用户是否存在
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.openid == openid)).first()
+        
+        if not user:
+            # 创建新用户
+            user = User(
+                openid=openid,
+                gender=profile_data.gender,
+                birth_date=datetime.strptime(profile_data.birth_date, "%Y-%m-%d"),
+                height=profile_data.height,
+                weight=profile_data.weight,
+                region_code=profile_data.region_code,
+                occupation=profile_data.occupation,
+                income_level=profile_data.income_level,
+                education=profile_data.education,
+                religion=profile_data.religion,
+                mbti=profile_data.mbti,
+                phone=profile_data.phone,
+                mem=profile_data.mem,
+                mem_pri=profile_data.mem_pri
+            )
+            session.add(user)
+        else:
+            # 更新现有用户
+            user.gender = profile_data.gender
+            user.birth_date = datetime.strptime(profile_data.birth_date, "%Y-%m-%d")
+            user.height = profile_data.height
+            user.weight = profile_data.weight
+            user.region_code = profile_data.region_code
+            user.occupation = profile_data.occupation
+            user.income_level = profile_data.income_level
+            user.education = profile_data.education
+            user.religion = profile_data.religion
+            user.mbti = profile_data.mbti
+            user.phone = profile_data.phone
+            user.mem = profile_data.mem
+            user.mem_pri = profile_data.mem_pri
+        
+        session.commit()
+    
+    return {"status": "success", "message": "资料保存成功"}
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8080)

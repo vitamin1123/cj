@@ -354,9 +354,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast, Calendar, Popup, Icon, Field } from 'vant';
+import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast,showFailToast,showSuccessToast, Calendar, Popup, Icon, Field } from 'vant';
 import { areaList } from '@vant/area-data';
 import lunisolar from 'lunisolar';
+import apiClient from '@/plugins/axios';
 
 const router = useRouter();
 const swipeRef = ref();
@@ -366,9 +367,9 @@ const showDatePicker = ref(false);
 const dateValue = ref(new Date());
 
 const currentDate = ref([
-  new Date().getFullYear(),
-  new Date().getMonth() + 1,
-  new Date().getDate()
+  (new Date().getFullYear()).toString(),
+  (new Date().getMonth() + 1).toString(),
+  (new Date().getDate()).toString()
 ]);
 
 const minDate = new Date(1980, 0, 1);
@@ -381,7 +382,7 @@ const showReligionPicker = ref(false);
 // 表单数据
 const formData = ref({
   gender: '',
-  birthDate: null as Date | null,
+  birthDate: new Date(),
   height: '',
   weight: '',
   region: '',
@@ -404,15 +405,17 @@ const weightValidator = (value: string | number) => {
   return Number(value) <= 250;
 };
 
-const onDateConfirm = ({ selectedValues }: { selectedValues: number[] }) => {
-  const [year, month, day] = selectedValues;
-  const selectedDate = new Date(year, month - 1, day);
-  formData.value.birthDate = selectedDate;
+const onDateConfirm = (params:any) => {
+  const { selectedValues } = params;
+  // selectedValues 是 string[], 例如 ['2023', '10', '26']
+  currentDate.value = selectedValues; // 更新 currentDate 以保持 date-picker 的 v-model
+  // 将选择的年月日转换为 Date 对象存储
+  formData.value.birthDate = new Date(parseInt(selectedValues[0]), parseInt(selectedValues[1]) - 1, parseInt(selectedValues[2]));
   showDatePicker.value = false;
 };
 
 const formatSolar = (date: Date | null) => {
-  if (!date) return '请选择出生日期';
+  if (!date) return '请选择日期';
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 };
 
@@ -422,7 +425,7 @@ const formatLunar = (date: Date | null) => {
 };
 
 // 地区选择确认 - 更新为Vant4格式
-const onReligionConfirm = ({ selectedOptions }) => {
+const onReligionConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
   formData.value.religion = selectedOptions[0].text;
   showReligionPicker.value = false;
 };
@@ -535,13 +538,43 @@ currentStep.value--;
 
 const submitForm = async () => {
   try {
-    // 这里调用API提交表单数据
-    console.log('提交表单数据:', formData.value);
-    Toast.success('信息保存成功！');
-    router.push('/home');
+    // 将表单数据转换为后端需要的格式
+    const profileData = {
+      gender: formData.value.gender,
+      birth_date: formData.value.birthDate ? (formData.value.birthDate) : null,
+      height: formData.value.height ? parseInt(formData.value.height) : null,
+      weight: formData.value.weight ? parseFloat(formData.value.weight) : null,
+      region_code: formData.value.regionCode,
+      occupation: formData.value.occupation,
+      income_level: formData.value.income,
+      education: formData.value.education,
+      religion: formData.value.religion,
+      mbti: formData.value.mbti,
+      phone: formData.value.phone,
+      mem: formData.value.bio,
+      mem_pri: formData.value.privateBio
+    };
+    
+    // 调用API提交表单数据
+    const response = await apiClient.post('/api/profile', profileData);
+    
+    if (response.status === 200) {
+      showSuccessToast('信息保存成功！');
+      router.push('/home');
+    } else {
+      showFailToast('保存失败，请重试');
+    }
   } catch (error) {
-    Toast.fail('保存失败，请重试');
+    showFailToast('保存失败，请重试');
+    console.error('提交失败:', error);
   }
+};
+
+const formatDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 onMounted(() => {
