@@ -180,6 +180,7 @@
               placeholder="请输入职业"
               input-align="center"
               :rules="[{ required: true, message: '请输入职业' }]"
+              maxlength="50"
             />
           </div>
         </div>
@@ -233,7 +234,7 @@
           <p class="card-subtitle">你的宗教信仰(可选)</p>
           <div class="input-container">
             <van-field
-  v-model="formData.religion"
+  v-model="formData.religionText"
   is-link
   readonly
   label="宗教信仰"
@@ -386,11 +387,12 @@ const formData = ref({
   height: '',
   weight: '',
   region: '',
-  regionCode: '', // 新增：存储地区码
+  regionCode: '321282', 
   occupation: '',
   income: '',
   education: '',
   religion: '',
+  religionText: '',
   mbti: '',
   phone: '',
   bio: '',
@@ -424,9 +426,10 @@ const formatLunar = (date: Date | null) => {
   return lunisolar(date).format('lY年(cZ年) lMlD');
 };
 
-// 地区选择确认 - 更新为Vant4格式
+
 const onReligionConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
-  formData.value.religion = selectedOptions[0].text;
+  formData.value.religion = selectedOptions[0].value;
+  formData.value.religionText = selectedOptions[0].text;
   showReligionPicker.value = false;
 };
 
@@ -541,7 +544,7 @@ const submitForm = async () => {
     // 将表单数据转换为后端需要的格式
     const profileData = {
       gender: formData.value.gender,
-      birth_date: formData.value.birthDate ? (formData.value.birthDate) : null,
+      birth_date: formData.value.birthDate ? formatDate(formData.value.birthDate) : null,
       height: formData.value.height ? parseInt(formData.value.height) : null,
       weight: formData.value.weight ? parseFloat(formData.value.weight) : null,
       region_code: formData.value.regionCode,
@@ -576,6 +579,64 @@ const formatDate = (date: Date) => {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+onMounted(async () => {
+  // 初始化当前日期为今天
+  dateValue.value = formData.value.birthDate || new Date();
+  
+  try {
+    const response = await apiClient.get('/api/getprofile');
+    if (response.status === 200 && response.data) {
+      const profile = response.data;
+      formData.value.gender = profile.gender || '';
+      if (profile.birth_date) {
+        const birthDateObj = new Date(profile.birth_date);
+        formData.value.birthDate = birthDateObj;
+        
+        // 更新日期选择器显示值
+        currentDate.value = [
+          birthDateObj.getFullYear().toString(),
+          (birthDateObj.getMonth() + 1).toString(),
+          birthDateObj.getDate().toString()
+        ];
+      }
+      formData.value.height = profile.height ? String(profile.height) : '';
+      formData.value.weight = profile.weight ? String(profile.weight) : '';
+      formData.value.region = profile.region || '';
+      formData.value.regionCode = profile.region_code || '321282';
+      formData.value.occupation = profile.occupation || '';
+      formData.value.income = profile.income_level || '';
+      formData.value.education = profile.education || '';
+      formData.value.religion = profile.religion || '';
+      formData.value.mbti = profile.mbti || '';
+      formData.value.phone = profile.phone || '';
+      formData.value.bio = profile.mem || '';
+      formData.value.privateBio = profile.mem_pri || '';
+
+      // 更新日期选择器显示值
+      if (profile.birth_date) {
+        const birthDate = new Date(profile.birth_date);
+        currentDate.value = [
+          birthDate.getFullYear().toString(),
+          (birthDate.getMonth() + 1).toString(),
+          birthDate.getDate().toString()
+        ];
+      }
+    }
+  } catch (error) {
+    console.error('加载用户资料失败:', error);
+    // 如果是404，表示用户资料不存在，可以忽略
+   
+  }
+});
+
+
+// const formatDate = (date: Date) => {
+//   const year = date.getFullYear();
+//   const month = String(date.getMonth() + 1).padStart(2, '0');
+//   const day = String(date.getDate()).padStart(2, '0');
+//   return `${year}-${month}-${day}`;
+// };
 
 onMounted(() => {
   // 初始化当前日期为今天

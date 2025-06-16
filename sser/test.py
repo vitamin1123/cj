@@ -9,7 +9,7 @@ import jwt
 from sqlmodel import SQLModel, Field, create_engine, Session, select
 from datetime import datetime, timedelta
 from fastapi import Depends, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 
 app = FastAPI()
@@ -61,7 +61,7 @@ engine = create_engine(DATABASE_URL)
 # 用户资料模型
 class ProfileData(BaseModel):
     gender: str
-    birth_date: str
+    birth_date: datetime
     height: Optional[int] = None
     weight: Optional[float] = None
     region_code: Optional[str] = None
@@ -73,7 +73,17 @@ class ProfileData(BaseModel):
     phone: Optional[str] = None
     mem: Optional[str] = None
     mem_pri: Optional[str] = None
-
+    # 添加格式验证器确保兼容性
+    @field_validator('birth_date', mode='before')
+    def parse_birth_date(cls, value):
+        if isinstance(value, str):
+            try:
+                # 尝试解析 ISO 格式
+                return datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                # 兼容旧格式
+                return datetime.strptime(value, "%Y-%m-%d")
+        return value
     # JWT工具函数
 def create_jwt_token(openid: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRE_MINUTES)
@@ -145,6 +155,7 @@ async def wechat_callback(code: str, state: str = None):
     openid = result["openid"]
     # 生成JWT
     token = create_jwt_token(openid)
+    #redirect_url = f"http://localhost:5173/auth-success?token={token}"
     redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
     return RedirectResponse(url=redirect_url)
 
@@ -190,45 +201,32 @@ async def add_profile(
     # 检查用户是否存在
     with Session(engine) as session:
         user = session.exec(select(User).where(User.openid == openid)).first()
-        
+        print('user:',user)
         if not user:
             # 创建新用户
             user = User(
                 openid=openid,
-                gender=profile_data.gender,
-                birth_date=datetime.strptime(profile_data.birth_date, "%Y-%m-%d"),
-                height=profile_data.height,
-                weight=profile_data.weight,
-                region_code=profile_data.region_code,
-                occupation=profile_data.occupation,
-                income_level=profile_data.income_level,
-                education=profile_data.education,
-                religion=profile_data.religion,
-                mbti=profile_data.mbti,
-                phone=profile_data.phone,
-                mem=profile_data.mem,
-                mem_pri=profile_data.mem_pri
+                **profile_data.model_dump()  # 直接使用转换后的数据
             )
             session.add(user)
         else:
             # 更新现有用户
-            user.gender = profile_data.gender
-            user.birth_date = datetime.strptime(profile_data.birth_date, "%Y-%m-%d")
-            user.height = profile_data.height
-            user.weight = profile_data.weight
-            user.region_code = profile_data.region_code
-            user.occupation = profile_data.occupation
-            user.income_level = profile_data.income_level
-            user.education = profile_data.education
-            user.religion = profile_data.religion
-            user.mbti = profile_data.mbti
-            user.phone = profile_data.phone
-            user.mem = profile_data.mem
-            user.mem_pri = profile_data.mem_pri
+            for key, value in profile_data.model_dump().items():
+                setattr(user, key, value)
         
         session.commit()
     
     return {"status": "success", "message": "资料保存成功"}
+
+@app.get("/getprofile")
+async def get_profile(
+    openid: str = Depends(get_current_user)
+):
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.openid == openid)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户资料未找到")
+        return user.model_dump(exclude={"openid"})
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
