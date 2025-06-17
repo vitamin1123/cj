@@ -94,7 +94,7 @@ const userInfo = ref({
 });
 
 const goBack = () => {
-  router.go(-1);
+  router.replace('/explore');
 };
 
 const toggleLike = () => {

@@ -6,12 +6,14 @@ import uvicorn
 import hashlib
 import hmac
 import jwt
+from sqlalchemy import event
 from sqlmodel import SQLModel, Field, create_engine, Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone  
 from fastapi import Depends, Header
 from pydantic import BaseModel, field_validator
 from typing import Optional
 
+beijing_tz = timezone(timedelta(hours=8))
 app = FastAPI()
 
 # JWT配置
@@ -51,13 +53,25 @@ class User(SQLModel, table=True):
     phone: str = Field(default=None)
     mem: str = Field(default=None)
     mem_pri: str = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
+    created_at: datetime = Field(default_factory=lambda: datetime.now(beijing_tz))
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(beijing_tz),
+        sa_column_kwargs={"onupdate": lambda: datetime.now(beijing_tz)}
+    )
 
 # 数据库连接
 DATABASE_URL = "mysql+pymysql://root:1234%40Qazx@localhost/cj"
+# DATABASE_URL = "mysql+pymysql://root:1234%40Qazx@localhost/cj?charset=utf8mb4&time_zone=%2B08:00"
+# DATABASE_URL = "mysql+pymysql://root:1234%40Qazx@localhost/cj?charset=utf8mb4&local_infile=1&timezone=+08:00"
 engine = create_engine(DATABASE_URL)
-
+@event.listens_for(engine, "connect")
+def set_time_zone(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    try:
+        # 设置会话时区为东八区
+        cursor.execute("SET time_zone = '+08:00';")
+    finally:
+        cursor.close()
 # 用户资料模型
 class ProfileData(BaseModel):
     gender: str
@@ -155,8 +169,8 @@ async def wechat_callback(code: str, state: str = None):
     openid = result["openid"]
     # 生成JWT
     token = create_jwt_token(openid)
-    #redirect_url = f"http://localhost:5173/auth-success?token={token}"
-    redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
+    redirect_url = f"http://localhost:5173/auth-success?token={token}"
+    # redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
     return RedirectResponse(url=redirect_url)
 
 @app.get("/wechat/auth")
@@ -192,6 +206,13 @@ async def wechat_auth(code: str, state: str = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/gettime")
+async def get_current_time():
+    current_time = datetime.now(beijing_tz)
+    return {
+        "current_time": current_time.isoformat(),
+        "timezone": "UTC+8"
+    }
 # 新增保存资料接口
 @app.post("/profile")
 async def add_profile(

@@ -9,7 +9,7 @@
             <div class="avatar" :style="{ backgroundImage: user.avatarUrl ? `url(${user.avatarUrl})` : 'none' }">
               <div v-if="!user.avatarUrl" class="avatar-placeholder">+</div>
             </div>
-            <div class="edit-hint">点击编辑</div>
+            <!-- <div class="edit-hint">点击编辑</div> -->
           </div>
           <div class="profile-info">
             <div class="nickname-container">
@@ -84,7 +84,7 @@ import { ref, nextTick } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { Toast, showToast  } from 'vant';
-
+import apiClient from '@/plugins/axios';
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -131,6 +131,8 @@ const user = ref<User>({
 const editAvatar = () => {
   avatarInput.value?.click();
 };
+// 请求示例 
+// const response = await apiClient.post('/api/profile', profileData);
 
 // 处理头像选择
 const handleAvatarChange = (event: Event) => {

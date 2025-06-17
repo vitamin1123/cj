@@ -53,17 +53,21 @@
         <div v-for="person in filteredPeopleList" :key="person.id" 
              class="person-card" 
              @click="goToDetail(person.id)">
-          <div class="card-image"></div>
+          <div class="card-image">
+            <div class="person-id-badge" :class="{ 'male-bg': person.gender === 'male', 'female-bg': person.gender === 'female' }">
+              {{ person.id }}
+            </div>
+          </div>
           <div class="card-content">
-            <div class="name" v-html="highlightText(person.name, searchKeyword)"></div>
+            <div class="name" v-html="highlightText(person.nickname && person.nickname.length > 7 ? person.nickname.substring(0, 7) + '...' : person.nickname || `用户${person.id}`, searchKeyword)"></div>
             <div class="height-container">
-              <div class="height">{{ person.height }}cm</div>
+              <div class="height">{{ person.birthYear }}年 {{ person.zodiac }}</div>
               <div class="heart-icon" @click.stop="toggleLike(person)">
                 <van-icon name="like" :class="{ liked: person.liked }" />
               </div>
             </div>
-            <div class="desc" v-html="highlightText(person.bio || person.occupation, searchKeyword)"></div>
-            <div class="region" v-html="highlightText(person.region, searchKeyword)"></div>
+            <div class="desc" v-html="highlightText(person.occupation || '未知职业', searchKeyword)"></div>
+            <div class="region">{{ person.height }}cm</div>
           </div>
         </div>
       </div>
@@ -86,11 +90,15 @@ import axios from 'axios';
 import { Toast,showFailToast,showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
 import apiClient from '@/plugins/axios';
+import lunisolar from 'lunisolar';
 
 // 定义 Person 接口
 interface Person {
   id: number; // 或者 string，根据后端返回确定
   name: string;
+  nickname?: string; // 新增昵称字段
+  birthYear?: number; // 新增出生年份
+  zodiac?: string; // 新增属相
   height: number;
   gender: 'male' | 'female' | string; // 根据实际情况调整
   region: string;
@@ -274,31 +282,56 @@ const toggleFilter = (filter: Filter) => {
 // 加载用户数据
 const loadUserProfiles = async () => {
   try {
+    const response = await apiClient.get('/api/explore_people');
     
-    
-    const response = await apiClient.get('/api/profiles');
-    
-    allPeopleList.value = response.data.map((profile: any) => ({
-      id: profile.id,
-      name: profile.name,
-      height: profile.height,
-      gender: profile.gender,
-      region: profile.region,
-      occupation: profile.occupation,
-      education: profile.education,
-      mbti: profile.mbti,
-      bio: profile.bio,
-      liked: false, // 这里可以从后端获取用户的喜欢状态
-      isNew: false // 这里可以根据创建时间判断是否为新用户
-    }));
+    // 直接使用后端返回的数据结构
+    allPeopleList.value = response.data.people.map((profile: any) => {
+      const birthDate = profile.birth_date ? new Date(profile.birth_date) : null;
+      const birthYear = birthDate ? birthDate.getFullYear() : undefined;
+      const zodiac = birthDate ? formatLunar(birthDate) : undefined;
+
+      return {
+        id: profile.id , // 如果没有ID，生成随机ID
+        name: profile.name || "", // 假设后端返回name字段
+        nickname: profile.nickname , // 使用name作为nickname，如果为空则显示编号
+        birthYear: birthYear,
+        zodiac: zodiac,
+        height: profile.height || 0,
+        gender: profile.gender || 'unknown',
+        region: profile.region_code || '未知地区',
+        occupation: profile.occupation || '未知职业',
+        education: profile.education || '未知学历',
+        mbti: profile.mbti || '未知性格',
+        bio: profile.mbti ? `${profile.mbti}型人格` : '暂无简介', // 使用MBTI作为简介
+        liked: false,
+        isNew: false
+      };
+      // /root/miniconda3/envs/cj/bin/python
+    });
     
     // 初始化过滤列表
     filteredPeopleList.value = [...allPeopleList.value];
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('加载用户数据失败:', error);
-    showFailToast('加载数据失败');
+    
+    // 解析FastAPI的错误响应
+    let errorMessage = '加载数据失败';
+    if (error.response && error.response.data && error.response.data.detail) {
+      if (typeof error.response.data.detail === 'string') {
+        errorMessage = error.response.data.detail;
+      } else if (Array.isArray(error.response.data.detail)) {
+        errorMessage = error.response.data.detail.map((d: any) => d.msg).join('; ');
+      }
+    }
+    
+    showFailToast(errorMessage);
   }
+};
+
+const formatLunar = (date: Date | null) => {
+  if (!date) return '';
+  return lunisolar(date).format('cZ'); // 只返回属相
 };
 
 const toggleLike = (person: Person) => {
@@ -514,74 +547,97 @@ onMounted(() => {
 }
 
 .person-card {
-  background-color: #FFFFFF;
-  border-radius: 8px;
+  background-color: #fff;
+  border-radius: 0 12px 12px 12px;
   overflow: hidden;
-  border: 1px solid #D9D9D9;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.person-card:active {
-  transform: scale(0.98);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .card-image {
   width: 100%;
-  height: 200px;
-  background-color: #D9D9D9;
+  height: 180px; /* 示例高度 */
+  background-color: #f0f0f0; /* 占位符颜色 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  color: #999;
+  position: relative; /* 使内部绝对定位的元素相对于它 */
+}
+
+.person-id-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.5); /* 默认背景 */
+  color: #fff;
+  padding: 2px 6px; /* 缩小内边距 */
+  border-radius: 4px 0 2px 0; /* 仅左上角有弧度 */
+  font-size: 10px; /* 缩小字体大小 */
+  z-index: 1;
+}
+
+.male-bg {
+  background-color: #6495ED; /* 男生蓝色 */
+}
+
+.female-bg {
+  background-color: #FF69B4; /* 女生粉色 */
 }
 
 .card-content {
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .name {
   font-size: 16px;
+  font-weight: bold;
   color: #333;
-  margin-bottom: 8px;
-  font-weight: 500;
 }
 
 .height-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
 }
 
 .height {
   font-size: 14px;
-  color: #6A6A6A;
+  color: #666;
 }
 
-.heart-icon {
-  font-size: 18px;
+.heart-icon .van-icon {
+  font-size: 20px;
   color: #ccc;
-  transition: color 0.3s;
+  transition: color 0.2s ease;
 }
 
-.heart-icon .liked {
-  color: #ff4757;
+.heart-icon .van-icon.liked {
+  color: #ff4d4f; /* 红色 */
 }
 
 .desc {
-  font-size: 12px;
-  color: #6A6A6A;
-  line-height: 1.4;
+  font-size: 13px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .region {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
+  font-size: 13px;
+  color: #888;
 }
 
 .highlight {
-  background-color: #FFE066;
-  color: #333;
+  color: #FF4D4F;
   font-weight: bold;
-  padding: 0 2px;
-  border-radius: 2px;
 }
 </style>
+
