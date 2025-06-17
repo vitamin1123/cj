@@ -563,7 +563,7 @@ const submitForm = async () => {
     
     if (response.status === 200) {
       showSuccessToast('信息保存成功！');
-      router.push('/home');
+      router.replace('/home');
     } else {
       showFailToast('保存失败，请重试');
     }

@@ -1,9 +1,9 @@
 <template>
-  <div class="explore-container">
+  <div class="explore-container" @click="handlePageClick">
     <!-- 页面内容 -->
     <div class="page-content">
-      <!-- 搜索框 -->
-      <div class="search-container">
+      <!-- 搜索框 - 优化后样式 -->
+      <div class="search-container" @click.stop>
         <div class="search-card" :class="{ focused: isSearchFocused }">
           <div class="search-box">
             <t-icon name="search" class="search-icon" />
@@ -34,8 +34,6 @@
             </div>
           </div>
         </div>
-        <!-- 遮罩层 -->
-        <div class="search-mask" v-if="isSearchFocused" @click="closeSearch"></div>
       </div>
 
       <!-- 筛选标签 -->
@@ -87,6 +85,7 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Toast,showFailToast,showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
+import apiClient from '@/plugins/axios';
 
 // 定义 Person 接口
 interface Person {
@@ -141,6 +140,13 @@ const handleSearchFocus = () => {
 
 const closeSearch = () => {
   isSearchFocused.value = false;
+};
+
+// 点击页面其他区域关闭搜索框
+const handlePageClick = () => {
+  if (isSearchFocused.value) {
+    closeSearch();
+  }
 };
 
 // 搜索处理函数
@@ -268,17 +274,9 @@ const toggleFilter = (filter: Filter) => {
 // 加载用户数据
 const loadUserProfiles = async () => {
   try {
-    const token = localStorage.getItem('wechat_token');
-    if (!token) {
-      showFailToast('请先登录');
-      return;
-    }
     
-    const response = await axios.get('/profiles', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    
+    const response = await apiClient.get('/api/profiles');
     
     allPeopleList.value = response.data.map((profile: any) => ({
       id: profile.id,
@@ -308,7 +306,7 @@ const toggleLike = (person: Person) => {
 };
 
 const goToDetail = (id: number | string) => {
-  router.push(`/detail/${id}`);
+  router.replace(`/detail/${id}`);
 };
 
 const tabs = [
@@ -366,7 +364,7 @@ onMounted(() => {
   min-height: calc(100vh - 92px);
 }
 
-/* 搜索框样式 - 复用Home页面样式 */
+/* ================= 搜索框样式优化 ================= */
 .search-container {
   margin-bottom: 16px;
   position: relative;
@@ -378,17 +376,25 @@ onMounted(() => {
   background-color: #EBE3D7;
   border-radius: 50px;
   padding: 12px 16px;
-  transition: all 0.3s ease;
+  /* 优化过渡效果：更慢更柔和 */
+  transition: all 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
   position: relative;
   z-index: 10;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* 解决iOS边框问题 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
 }
 
 .search-card.focused {
   border-radius: 12px;
   padding-bottom: 16px;
-  position: absolute;
-  width: calc(100% - 32px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-height: 300px;
 }
 
 .search-box {
@@ -404,23 +410,43 @@ onMounted(() => {
   width: 100%;
   font-family: "Microsoft YaHei", sans-serif;
   font-size: 14px;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .search-options {
   margin-top: 12px;
-  animation: fadeIn 0.3s ease;
+  /* 优化动画效果 */
+  animation: slideDown 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  opacity: 0;
+  transform-origin: top;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .search-option-item {
   display: flex;
   align-items: center;
   margin-bottom: 12px;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .option-label {
   width: 60px;
   font-size: 14px;
   color: #6A6A6A;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .option-input {
@@ -438,6 +464,8 @@ onMounted(() => {
   padding: 8px 32px 8px 12px;
   font-size: 14px;
   outline: none;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .clear-icon {
@@ -445,17 +473,10 @@ onMounted(() => {
   right: 8px;
   color: #ccc;
   font-size: 16px;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
-
-.search-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 5;
-}
+/* ================= 搜索框样式优化结束 ================= */
 
 /* 筛选标签 */
 .filter-section {
@@ -556,16 +577,6 @@ onMounted(() => {
   margin-top: 4px;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 .highlight {
   background-color: #FFE066;
   color: #333;

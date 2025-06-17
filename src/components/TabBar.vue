@@ -36,7 +36,7 @@ const router = useRouter();
 const handleTabClick = (tab: TabItem) => {
   emit('update:activeTab', tab.id);
   if (tab.to) {
-    router.push(tab.to);
+    router.replace(tab.to);
   }
 };
 </script>
@@ -44,7 +44,7 @@ const handleTabClick = (tab: TabItem) => {
 <style scoped>
 /* 调整后的样式：上方10%高度有轻微模糊渐变，下方完全不透明 */
 .custom-tabbar {
-  height: 100px;
+  height: 55px;
   background: linear-gradient(to top, 
     rgba(242, 238, 232, 0.3) 0%,     /* 顶部70%透明 */
     rgba(242, 238, 232, 0.6) 50%,    /* 中间40%透明 */

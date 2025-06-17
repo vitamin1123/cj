@@ -5,11 +5,28 @@
       <!-- 顶部卡片 -->
       <div class="profile-card">
         <div class="profile-content">
-          <div class="avatar-wrapper">
-            <div class="avatar"></div>
+          <div class="avatar-wrapper" @click="editAvatar">
+            <div class="avatar" :style="{ backgroundImage: user.avatarUrl ? `url(${user.avatarUrl})` : 'none' }">
+              <div v-if="!user.avatarUrl" class="avatar-placeholder">+</div>
+            </div>
+            <div class="edit-hint">点击编辑</div>
           </div>
           <div class="profile-info">
-            <div class="nickname">{{ user.nickname }}</div>
+            <div class="nickname-container">
+              <div v-if="!isEditingNickname" class="nickname" @click="editNickname">{{ user.nickname }}</div>
+              <div v-else class="nickname-edit">
+                <input 
+                  v-model="tempNickname" 
+                  @blur="saveNickname" 
+                  @keyup.enter="saveNickname"
+                  @keyup.esc="cancelEdit"
+                  maxlength="10"
+                  class="nickname-input"
+                  ref="nicknameInput"
+                />
+                <div class="char-count">{{ tempNickname.length }}/10</div>
+              </div>
+            </div>
             <div class="stats">
               <div class="stat-item">
                 <div class="stat-number">{{ user.likesCount }}</div>
@@ -36,7 +53,7 @@
             v-for="item in menuItems" 
             :key="item.id" 
             class="menu-item"
-            @click="item.route ? router.push(item.route) : item.action && item.action()"
+            @click="item.route ? router.replace(item.route) : item.action && item.action()"
           >
             {{ item.label }}
           </div>
@@ -50,13 +67,23 @@
       @update:active-tab="activeTab = $event"
       :tabs="tabs"
     />
+    
+    <!-- 头像选择器 -->
+    <input 
+      ref="avatarInput" 
+      type="file" 
+      accept="image/*" 
+      @change="handleAvatarChange" 
+      style="display: none;"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
+import { Toast, showToast  } from 'vant';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -87,6 +114,10 @@ interface User {
 
 const activeTab = ref('profile');
 const router = useRouter();
+const avatarInput = ref<HTMLInputElement>();
+const nicknameInput = ref<HTMLInputElement>();
+const isEditingNickname = ref(false);
+const tempNickname = ref('');
 
 const user = ref<User>({
   nickname: '用户昵称',
@@ -95,6 +126,62 @@ const user = ref<User>({
   likedByCount: 5,
   recentVisitorsCount: 20,
 });
+
+// 编辑头像
+const editAvatar = () => {
+  avatarInput.value?.click();
+};
+
+// 处理头像选择
+const handleAvatarChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    // 检查文件大小（限制为5MB）
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('图片大小不能超过5MB');
+      return;
+    }
+    
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      showToast('请选择图片文件');
+      return;
+    }
+    
+    // 创建预览URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      user.value.avatarUrl = e.target?.result as string;
+      showToast('头像更新成功');
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+// 编辑昵称
+const editNickname = () => {
+  isEditingNickname.value = true;
+  tempNickname.value = user.value.nickname;
+  nextTick(() => {
+    nicknameInput.value?.focus();
+  });
+};
+
+// 保存昵称
+const saveNickname = () => {
+  if (tempNickname.value.trim()) {
+    user.value.nickname = tempNickname.value.trim();
+    showToast('昵称更新成功');
+  }
+  isEditingNickname.value = false;
+};
+
+// 取消编辑
+const cancelEdit = () => {
+  isEditingNickname.value = false;
+  tempNickname.value = '';
+};
 
 const menuItems = ref<MenuItem[]>([
   { id: 'profile-maintenance', label: '资料维护', route: '/profile-setup' },
@@ -143,6 +230,8 @@ const tabs = [
   font-family: "Microsoft YaHei", sans-serif;
   display: flex;
   flex-direction: column;
+
+  padding-bottom: 100px; /* 为底部TabBar留出空间，包含iOS安全区域 */
 }
 
 .page-content {
@@ -165,6 +254,13 @@ const tabs = [
 
 .avatar-wrapper {
   margin-right: 16px;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.avatar-wrapper:hover {
+  transform: scale(1.05);
 }
 
 .avatar {
@@ -172,6 +268,28 @@ const tabs = [
   height: 80px;
   border-radius: 50%;
   background-color: #D9D9D9;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.avatar-placeholder {
+  font-size: 24px;
+  color: white;
+  font-weight: bold;
+}
+
+.edit-hint {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #666;
+  white-space: nowrap;
 }
 
 .profile-info {
@@ -180,12 +298,52 @@ const tabs = [
   flex-direction: column;
 }
 
+.nickname-container {
+  text-align: right;
+  margin-bottom: 8px;
+}
+
 .nickname {
   font-size: 20px;
   color: #333;
   font-weight: 500;
   margin-bottom: 16px;
   align-self: flex-start;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  display: inline-block;
+}
+
+.nickname:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.nickname-edit {
+  position: relative;
+  display: inline-block;
+}
+
+.nickname-input {
+  font-size: 20px;
+  font-weight: 500;
+  color: #333;
+  border: 2px solid #D75670;
+  border-radius: 4px;
+  padding: 4px 8px;
+  background: white;
+  outline: none;
+  text-align: right;
+  min-width: 120px;
+}
+
+.char-count {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  font-size: 10px;
+  color: #666;
 }
 
 .stats {

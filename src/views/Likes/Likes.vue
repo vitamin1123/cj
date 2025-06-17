@@ -163,11 +163,11 @@ const removeLike = (person: LikedPerson) => {
 };
 
 const goToDetail = (id: number) => {
-  router.push(`/detail/${id}`);
+  router.replace(`/detail/${id}`);
 };
 
 const goToExplore = () => {
-  router.push('/explore');
+  router.replace('/explore');
 };
 
 const tabs = [

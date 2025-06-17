@@ -27,9 +27,9 @@
     </div>
 
     <!-- 页面内容 -->
-    <div v-else class="page-content">
-      <!-- 搜索框 -->
-      <div class="search-container">
+    <div v-else class="page-content" @click="handlePageClick">
+      <!-- 搜索框 - 主要修改区域 -->
+      <div class="search-container" @click.stop>
         <div class="search-card" :class="{ focused: isSearchFocused }">
           <div class="search-box">
             <t-icon name="search" class="search-icon" />
@@ -58,8 +58,6 @@
             </div>
           </div>
         </div>
-        <!-- 遮罩层 -->
-        <div class="search-mask" v-if="isSearchFocused" @click="closeSearch"></div>
       </div>
 
       <!-- 其他原有内容保持不变 -->
@@ -91,7 +89,6 @@
         <h2 class="section-title">可能感兴趣</h2>
         <van-swipe class="recommend-swipe" :loop="true" :width="240" :height="366" indicator-color="transparent">
           <van-swipe-item v-for="i in 4" :key="i">
-            <!-- 在推荐卡片上添加点击事件 -->
             <div class="recommend-card" @click="goToDetail(i)">
               <div class="card-image"></div>
               <div class="card-content">
@@ -120,10 +117,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'; // Import onMounted
+import { ref, onMounted } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/store/authStore'; // Assuming you have an auth store
+import { useAuthStore } from '@/store/authStore';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -138,24 +135,16 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const activeTab = ref('home');
 const router = useRouter();
 const isSearchFocused = ref(false);
-
-// Add missing reactive variables and functions
-const isLoading = ref(true); // Or false, depending on initial state
-const authError = ref<string | null>(null); // To store authentication error messages
+const isLoading = ref(true);
+const authError = ref<string | null>(null);
 const authStore = useAuthStore();
 
 const checkAuth = async () => {
   isLoading.value = true;
   authError.value = null;
   try {
-    // Example: Check if user is authenticated or fetch initial data
-    // Replace with your actual authentication logic
-    console.log('看看首页的token：',authStore.token); // Assuming your authStore has this action
-    // if (!authStore.isAuthenticated) {
-    //   // authError.value = '用户未登录或会话已过期。';
-    //   // router.push('/login'); // Redirect to login if not authenticated
-    // }
-  } catch (error: any) { // Explicitly type error
+    console.log('看看首页的token：',authStore.token);
+  } catch (error: any) {
     console.error('Authentication check failed:', error);
     authError.value = error.message || '认证检查失败，请稍后重试。';
   } finally {
@@ -168,7 +157,7 @@ const retryAuth = () => {
 };
 
 onMounted(() => {
-  checkAuth(); // Check authentication status when component is mounted
+  checkAuth();
 });
 
 const handleSearchFocus = () => {
@@ -177,6 +166,13 @@ const handleSearchFocus = () => {
 
 const closeSearch = () => {
   isSearchFocused.value = false;
+};
+
+// 点击页面其他区域关闭搜索框
+const handlePageClick = () => {
+  if (isSearchFocused.value) {
+    closeSearch();
+  }
 };
 
 const tabs = [
@@ -212,12 +208,12 @@ const tabs = [
 
 const handleTabClick = (tab: any) => {
   if (tab.to) {
-    router.push(tab.to);
+    router.replace(tab.to);
   }
 };
 
 const goToDetail = (id: number) => {
-  router.push(`/detail/${id}`);
+  router.replace(`/detail/${id}`);
 };
 </script>
 
@@ -363,6 +359,7 @@ const goToDetail = (id: number) => {
   min-height: calc(100vh - 92px);
 }
 
+/* 搜索容器 - 重点修改区域 */
 .search-container {
   margin-bottom: 16px;
   position: relative;
@@ -374,17 +371,27 @@ const goToDetail = (id: number) => {
   background-color: #EBE3D7;
   border-radius: 50px;
   padding: 12px 16px;
-  transition: all 0.3s ease;
+  /* 优化过渡效果：更慢更柔和 */
+  transition: all 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
   position: relative;
   z-index: 10;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* 解决iOS边框问题 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
 }
 
 .search-card.focused {
   border-radius: 12px;
   padding-bottom: 16px;
-  position: absolute;
-  width: calc(100% - 32px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  /* 移除fixed定位，改为相对布局 */
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  /* 添加最大高度限制防止过大 */
+  max-height: 300px;
 }
 
 .search-box {
@@ -400,23 +407,43 @@ const goToDetail = (id: number) => {
   width: 100%;
   font-family: "Microsoft YaHei", sans-serif;
   font-size: 14px;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .search-options {
   margin-top: 12px;
-  animation: fadeIn 0.3s ease;
+  /* 优化动画效果 */
+  animation: slideDown 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  opacity: 0;
+  transform-origin: top;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .search-option-item {
   display: flex;
   align-items: center;
   margin-bottom: 12px;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .option-label {
   width: 60px;
   font-size: 14px;
   color: #6A6A6A;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .option-input {
@@ -434,6 +461,8 @@ const goToDetail = (id: number) => {
   padding: 8px 32px 8px 12px;
   font-size: 14px;
   outline: none;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
 .clear-icon {
@@ -441,29 +470,11 @@ const goToDetail = (id: number) => {
   right: 8px;
   color: #ccc;
   font-size: 16px;
+  /* 添加过渡效果 */
+  transition: all 0.3s ease;
 }
 
-.search-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 5;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+/* 其他样式保持不变 */
 .news-section {
   margin-bottom: 24px;
 }
