@@ -49,7 +49,7 @@
       </div>
 
       <!-- 人员卡片列表 - 使用虚拟列表 -->
-      <div class="people-grid" ref="container" v-bind="containerProps">
+      <div class="people-grid"  v-bind="containerProps">
         <div v-bind="wrapperProps">
           <div v-for="{ index, data: person } in virtualList" :key="index" 
                class="person-card" 
@@ -595,7 +595,7 @@ onMounted(() => {
 
 /* 人员卡片网格 */
 .people-grid {
-  height: calc(100vh - 300px); /* 根据实际布局调整高度 */
+  height: calc(100vh - 100px); /* 根据实际布局调整高度 */
   overflow: auto; /* 启用滚动 */
   position: relative; /* 虚拟列表需要相对定位 */
 }
