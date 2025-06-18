@@ -59,7 +59,7 @@
             </div>
           </div>
           <div class="card-content">
-            <div class="name" v-html="highlightText(person.nickname && person.nickname.length > 7 ? person.nickname.substring(0, 7) + '...' : person.nickname || `用户${person.id}`, searchKeyword)"></div>
+            <div class="name" v-html="highlightText(person.nickname && person.nickname.length > 7 ? person.nickname.substring(0, 7) + '...' : person.nickname || `${person.id}`, searchKeyword)"></div>
             <div class="height-container">
               <div class="height">{{ person.birthYear }}年 {{ person.zodiac }}</div>
               <div class="heart-icon" @click.stop="toggleLike(person)">

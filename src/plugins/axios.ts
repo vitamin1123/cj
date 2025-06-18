@@ -42,7 +42,7 @@ apiClient.interceptors.response.use(
       // 或: authStore.token = null
       
       // 跳转到登录页（带当前路由参数便于登录后返回）
-      router.push({ path: '/login', query: { redirect: router.currentRoute.value.path } })
+      router.replace({ path: '/login', query: { redirect: router.currentRoute.value.path } })
     }
 
     return Promise.reject(error) // 继续传递错误

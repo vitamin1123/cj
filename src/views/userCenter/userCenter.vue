@@ -18,7 +18,6 @@
                 <input 
                   v-model="tempNickname" 
                   @blur="saveNickname" 
-                  @keyup.enter="saveNickname"
                   @keyup.esc="cancelEdit"
                   maxlength="10"
                   class="nickname-input"
@@ -80,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, onMounted  } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { Toast, showToast  } from 'vant';
@@ -127,6 +126,10 @@ const user = ref<User>({
   recentVisitorsCount: 20,
 });
 
+onMounted(() => {
+  fetchUserProfile();
+});
+
 // 编辑头像
 const editAvatar = () => {
   avatarInput.value?.click();
@@ -135,11 +138,41 @@ const editAvatar = () => {
 // const response = await apiClient.post('/api/profile', profileData);
 
 // 处理头像选择
-const handleAvatarChange = (event: Event) => {
+
+// 编辑昵称
+const editNickname = () => {
+  isEditingNickname.value = true;
+  tempNickname.value = user.value.nickname;
+  nextTick(() => {
+    nicknameInput.value?.focus();
+  });
+};
+
+const fetchUserProfile = async () => {
+  try {
+    const response = await apiClient.get('/api/getprofile');
+    const profileData = response.data;
+    
+    user.value = {
+      ...user.value,
+      nickname: profileData.nickname || '用户昵称',
+      avatarUrl: profileData.avatar_url || '',
+      likesCount: profileData.likesCount || 0,
+      likedByCount: profileData.likedByCount || 0,
+      recentVisitorsCount: profileData.recentVisitorsCount || 0,
+    };
+  } catch (error) {
+    console.error('获取用户资料失败', error);
+    showToast('获取用户资料失败');
+  }
+};
+
+// 上传头像
+const handleAvatarChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (file) {
-    // 检查文件大小（限制为5MB）
+    // 检查文件大小（限制5MB）
     if (file.size > 5 * 1024 * 1024) {
       showToast('图片大小不能超过5MB');
       return;
@@ -152,31 +185,53 @@ const handleAvatarChange = (event: Event) => {
     }
     
     // 创建预览URL
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      user.value.avatarUrl = e.target?.result as string;
+    const previewUrl = URL.createObjectURL(file);
+    user.value.avatarUrl = previewUrl;
+    
+    try {
+      // 创建FormData并上传文件
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await apiClient.post('/api/upload-avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      // 更新头像URL为服务器返回的URL
+      user.value.avatarUrl = response.data.avatar_url;
       showToast('头像更新成功');
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('头像上传失败', error);
+      showToast('头像上传失败');
+    } finally {
+      // 重置文件输入框
+      target.value = '';
+    }
   }
-};
-
-// 编辑昵称
-const editNickname = () => {
-  isEditingNickname.value = true;
-  tempNickname.value = user.value.nickname;
-  nextTick(() => {
-    nicknameInput.value?.focus();
-  });
 };
 
 // 保存昵称
-const saveNickname = () => {
+const saveNickname = async () => {
   if (tempNickname.value.trim()) {
-    user.value.nickname = tempNickname.value.trim();
-    showToast('昵称更新成功');
+    try {
+      // 调用更新昵称API
+      await apiClient.post('/api/update-nickname', {
+        nickname: tempNickname.value.trim(),
+      });
+      
+      user.value.nickname = tempNickname.value.trim();
+      showToast('昵称更新成功');
+    } catch (error) {
+      console.error('昵称更新失败', error);
+      showToast('昵称更新失败');
+    } finally {
+      isEditingNickname.value = false;
+    }
+  } else {
+    isEditingNickname.value = false;
   }
-  isEditingNickname.value = false;
 };
 
 // 取消编辑
