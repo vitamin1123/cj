@@ -186,13 +186,14 @@ const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
 
 // 获取人员图片URL
 const getPersonImage = (person: Person): string => {
+  
   if (person.photo) {
     const photos = person.photo.split(',');
     if (photos.length > 0 && photos[0].trim() !== '') {
-      return photos[0].trim();
+      return 'avatars/'+photos[0].trim();
     }
   }
-  return person.avatar || '';
+  return 'avatars/'+person.avatar || '';
 };
 
 const handleSearchFocus = () => {
