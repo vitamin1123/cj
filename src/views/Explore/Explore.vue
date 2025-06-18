@@ -48,32 +48,59 @@
         </div>
       </div>
 
-      <!-- 人员卡片列表 -->
-      <div class="people-grid">
-        <div v-for="person in filteredPeopleList" :key="person.id" 
-             class="person-card" 
-             @click="goToDetail(person.id)">
-          <div class="card-image">
-            <div class="person-id-badge" :class="{ 'male-bg': person.gender === 'male', 'female-bg': person.gender === 'female' }">
-              {{ person.id }}
-            </div>
-          </div>
-          <div class="card-content">
-            <div class="name" v-html="highlightText(person.nickname && person.nickname.length > 7 ? person.nickname.substring(0, 7) + '...' : person.nickname || `${person.id}`, searchKeyword)"></div>
-            <div class="height-container">
-              <div class="height">{{ person.birthYear }}年 {{ person.zodiac }}</div>
-              <div class="heart-icon" @click.stop="toggleLike(person)">
-                <van-icon name="like" :class="{ liked: person.liked }" />
+      <!-- 人员卡片列表 - 使用虚拟列表 -->
+      <div class="people-grid" ref="container" v-bind="containerProps">
+        <div v-bind="wrapperProps">
+          <div v-for="{ index, data: person } in virtualList" :key="index" 
+               class="person-card" 
+               @click="goToDetail(person.id)">
+            <div class="card-image">
+              <van-image
+                width="100%"
+                height="180px"
+                :src="getPersonImage(person)"
+                lazy-load
+                fit="cover"
+              >
+                <template v-slot:loading>
+                  <div class="image-placeholder">
+                    <van-icon name="photo" size="24" />
+                  </div>
+                </template>
+                <template v-slot:error>
+                  <div class="image-placeholder">
+                    <van-icon name="photo-fail" size="24" />
+                  </div>
+                </template>
+              </van-image>
+              <div class="person-id-badge" :class="{ 'male-bg': person.gender === 'male', 'female-bg': person.gender === 'female' }">
+                {{ person.id }}
               </div>
             </div>
-            <div class="desc" v-html="highlightText(person.occupation || '未知职业', searchKeyword)"></div>
-            <div class="region">{{ person.height }}cm</div>
+            <div class="card-content">
+              <div class="name-container">
+                <div class="name" v-html="highlightText(person.nickname && person.nickname.length > 7 ? person.nickname.substring(0, 7) + '...' : person.nickname || `${person.id}`, searchKeyword)"></div>
+                <div class="heart-icon" @click.stop="toggleLike(person)">
+                  <van-icon name="like" :class="{ liked: person.liked }" />
+                </div>
+              </div>
+              <div class="height-container">
+                <div class="height">{{ person.birthYear }}年 {{ person.zodiac }}</div>
+              </div>
+              <div class="info-row">
+                <div class="desc" v-html="highlightText(person.occupation || '未知职业', searchKeyword)"></div>
+                <div class="region">{{ person.height }}cm</div>
+              </div>
+              <div class="mem">
+                {{ person.mem.substring(0, 56)+'...' }}
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 底部TabBar -->
+    <!-- 底部TabBar      -->
     <TabBar 
       :active-tab="activeTab" 
       @update:active-tab="activeTab = $event"
@@ -87,10 +114,12 @@ import { ref, computed, onMounted } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { Toast,showFailToast,showSuccessToast } from 'vant';
+import { Toast, showFailToast, showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
 import apiClient from '@/plugins/axios';
 import lunisolar from 'lunisolar';
+import { Image as VanImage } from 'vant';
+import { useVirtualList } from '@vueuse/core'; // 引入虚拟列表
 
 // 定义 Person 接口
 interface Person {
@@ -105,9 +134,12 @@ interface Person {
   occupation?: string;
   education?: string;
   mbti?: string;
+  mem: string;
   bio?: string;
   liked: boolean;
   isNew: boolean;
+  avatar?: string;
+  photo?: string;
   // 其他可能的字段
   [key: string]: any; // 允许其他动态字段，但尽量明确
 }
@@ -141,6 +173,27 @@ const regionFilter = ref('');
 // 两个列表：全部数据和过滤后的数据
 const allPeopleList = ref<Person[]>([]);
 const filteredPeopleList = ref<Person[]>([]);
+
+// 虚拟列表相关
+const container = ref<HTMLElement | null>(null);
+const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
+  filteredPeopleList,
+  {
+    itemHeight: 260, // 每项高度（卡片高度 + 间距）
+    overscan: 5, // 预渲染的额外项数
+  }
+);
+
+// 获取人员图片URL
+const getPersonImage = (person: Person): string => {
+  if (person.photo) {
+    const photos = person.photo.split(',');
+    if (photos.length > 0 && photos[0].trim() !== '') {
+      return photos[0].trim();
+    }
+  }
+  return person.avatar || '';
+};
 
 const handleSearchFocus = () => {
   isSearchFocused.value = true;
@@ -296,17 +349,18 @@ const loadUserProfiles = async () => {
         nickname: profile.nickname , // 使用name作为nickname，如果为空则显示编号
         birthYear: birthYear,
         zodiac: zodiac,
+        mem: profile.mem || '',
         height: profile.height || 0,
         gender: profile.gender || 'unknown',
         region: profile.region_code || '未知地区',
         occupation: profile.occupation || '未知职业',
         education: profile.education || '未知学历',
         mbti: profile.mbti || '未知性格',
-        bio: profile.mbti ? `${profile.mbti}型人格` : '暂无简介', // 使用MBTI作为简介
+        avatar: profile.avatar || '',
+        photo: profile.photo || '',
         liked: false,
         isNew: false
       };
-      // /root/miniconda3/envs/cj/bin/python
     });
     
     // 初始化过滤列表
@@ -541,31 +595,36 @@ onMounted(() => {
 
 /* 人员卡片网格 */
 .people-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  height: calc(100vh - 300px); /* 根据实际布局调整高度 */
+  overflow: auto; /* 启用滚动 */
+  position: relative; /* 虚拟列表需要相对定位 */
 }
 
 .person-card {
   background-color: #fff;
-  border-radius: 0 12px 12px 12px;
+  border-radius: 2px 12px 12px 12px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   display: flex;
-  flex-direction: column;
   position: relative;
+  margin-bottom: 16px; /* 增加卡片间距 */
 }
 
 .card-image {
+  width: 120px; /* 固定图片宽度 */
+  height: 180px;
+  position: relative;
+  flex-shrink: 0; /* 防止图片被压缩 */
+}
+
+.image-placeholder {
   width: 100%;
-  height: 180px; /* 示例高度 */
-  background-color: #f0f0f0; /* 占位符颜色 */
+  height: 100%;
+  background-color: #f0f0f0;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 24px;
   color: #999;
-  position: relative; /* 使内部绝对定位的元素相对于它 */
 }
 
 .person-id-badge {
@@ -593,6 +652,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1; /* 填充剩余空间 */
+  position: relative;
 }
 
 .name {
@@ -612,6 +673,28 @@ onMounted(() => {
   color: #666;
 }
 
+.name-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  flex: 1; /* 占据剩余空间 */
+  margin-right: 8px; /* 添加右边距 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heart-icon {
+  flex-shrink: 0; /* 防止被压缩 */
+}
+
 .heart-icon .van-icon {
   font-size: 20px;
   color: #ccc;
@@ -622,22 +705,42 @@ onMounted(() => {
   color: #ff4d4f; /* 红色 */
 }
 
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .desc {
   font-size: 13px;
   color: #888;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1; /* 占据剩余空间 */
+  margin-right: 8px; /* 添加右边距 */
 }
 
 .region {
   font-size: 13px;
   color: #888;
+  flex-shrink: 0; /* 防止压缩 */
 }
+
+/* 新增的mem样式 */
+.mem {
+  font-size: 14px;
+  color: #666;
+  margin-top: 4px; /* 与上一行拉开距离 */
+}
+
+
 
 .highlight {
   color: #FF4D4F;
   font-weight: bold;
 }
 </style>
-
