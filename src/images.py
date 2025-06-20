@@ -11,9 +11,10 @@ if not os.path.exists('images'):
 # 定义下载函数
 def download_image(image_id):
     try:
-        image_id = image_id + 5628
+        image_id = image_id
         # 使用Picsum API获取随机图片，指定宽度为800像素
-        url = f'https://picsum.photos/seed/img{image_id}/800'
+        # url = f'https://picsum.photos/seed/img{image_id}/800'
+        url = f'https://i18.net/api.php?fl=meizi'
         response = requests.get(url, stream=True, timeout=10)
         
         # 检查响应状态
@@ -33,7 +34,7 @@ def download_image(image_id):
 # 主函数
 def main():
     # 图片总数
-    total_images = 100
+    total_images = 45000
     # 每次下载的批量大小
     batch_size = 100
     

@@ -8,7 +8,7 @@ def rename_images(directory):
     temp_files = []
     for index, filename in enumerate(files):
         old_path = os.path.join(directory, filename)
-        temp_filename = f"temp_{index + 1}.tmp"
+        temp_filename = f"temp_{index + 10000}.tmp"
         temp_path = os.path.join(directory, temp_filename)
         os.rename(old_path, temp_path)
         temp_files.append(temp_path)
@@ -17,7 +17,7 @@ def rename_images(directory):
     # Step 2: Rename temporary files to final names
     temp_files.sort(key=lambda x: int(os.path.basename(x).replace('temp_', '').replace('.tmp', '')))
     for index, temp_path in enumerate(temp_files):
-        final_filename = f"{index + 1}.jpg"
+        final_filename = f"{index + 10000}.jpg"
         final_path = os.path.join(directory, final_filename)
         os.rename(temp_path, final_path)
         print(f"Renamed {os.path.basename(temp_path)} to {final_filename}")

@@ -57,7 +57,7 @@
             <div class="card-image">
               <van-image
                 width="100%"
-                height="180px"
+                height="100%"
                 :src="getPersonImage(person)"
                 lazy-load
                 fit="cover"
@@ -603,7 +603,7 @@ onMounted(() => {
 
 .person-card {
   background-color: #fff;
-  border-radius: 2px 12px 12px 12px;
+  border-radius: 4px 12px 12px 12px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   display: flex;
@@ -613,9 +613,22 @@ onMounted(() => {
 
 .card-image {
   width: 120px; /* 固定图片宽度 */
-  height: 180px;
   position: relative;
   flex-shrink: 0; /* 防止图片被压缩 */
+  overflow: hidden; /* 添加这行防止图片溢出 */
+}
+
+.van-image {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+/* 修复van-image可能的内置样式 */
+:deep(.van-image__img) {
+  height: 100% !important;
+  width: 100% !important;
+  object-fit: cover;
 }
 
 .image-placeholder {

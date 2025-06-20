@@ -1,7 +1,6 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import Result404 from '@/views/NotFound404View/NotFound404View.vue'
-// import { useWechatStore } from '@/store/wechatStore'
 import { useAuthStore } from '@/store/authStore'
 import axios from 'axios'
 
