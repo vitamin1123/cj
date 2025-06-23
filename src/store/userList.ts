@@ -29,7 +29,7 @@ interface User {
 }
 
 interface UserListResponse {
-  people: User[]
+  people: string
   lasttime: string
 }
 
@@ -96,7 +96,8 @@ export const useUserListStore = defineStore(
       try {
         const response = await apiClient.get<UserListResponse>('/api/explore_people')
         if (response.status === 200 && response.data) {
-          people.value = response.data.people
+          const parsedPeople = JSON.parse(response.data.people) as User[]
+          people.value = parsedPeople
           lasttime.value = response.data.lasttime
         }
       } catch (err) {
