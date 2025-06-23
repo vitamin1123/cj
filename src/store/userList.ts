@@ -79,9 +79,17 @@ export const useUserListStore = defineStore(
     const checkLasttimeAndUpdate = async (): Promise<void> => {
       try {
         const response = await apiClient.get('/api/getlasttime')
-        const serverLasttime = response.data as string
+        const serverLasttime = response.data.lasttime as string
         
-        if (serverLasttime && (!lasttime.value || serverLasttime > lasttime.value)) {
+        // 判断是否是首次加载（本地没有lasttime或没有用户数据）
+        const isFirstLoad = !lasttime.value || people.value.length === 0
+        
+        // 如果有本地数据且服务器时间更新
+        if (!isFirstLoad && serverLasttime && lasttime.value && serverLasttime > lasttime.value) {
+          await fetchIncrementalUserList(lasttime.value) // 这里确保 lasttime.value 不为 null
+        }
+        // 如果是首次加载
+        else if (isFirstLoad) {
           await fetchUserList()
         }
       } catch (err) {
@@ -89,6 +97,7 @@ export const useUserListStore = defineStore(
         console.error('Failed to check lasttime:', err)
       }
     }
+
 
     const fetchUserList = async (): Promise<void> => {
       isLoading.value = true
@@ -107,7 +116,50 @@ export const useUserListStore = defineStore(
         isLoading.value = false
       }
     }
-
+// 获取增量数据
+const fetchIncrementalUserList = async (since: string): Promise<void> => {
+      isLoading.value = true
+      error.value = null
+      try {
+        const response = await apiClient.get<{ 
+          people: User[]; 
+          lasttime: string 
+        }>(`/api/explore_people_updated?since=${since}`)
+        
+        if (response.status === 200 && response.data) {
+          const newPeople = response.data.people
+          
+          // 如果没有新数据，直接返回
+          if (newPeople.length === 0) {
+            console.log('没有新的用户数据')
+            return
+          }
+          
+          // 创建现有用户的ID映射
+          const existingPeopleMap = new Map<number, User>()
+          people.value.forEach(user => existingPeopleMap.set(user.id, user))
+          
+          // 合并新数据
+          newPeople.forEach(newUser => {
+            existingPeopleMap.set(newUser.id, newUser)
+          })
+          
+          // 更新状态
+          people.value = Array.from(existingPeopleMap.values())
+          lasttime.value = response.data.lasttime
+          
+          console.log(`成功合并 ${newPeople.length} 条增量用户数据`)
+        }
+      } catch (err) {
+        error.value = '获取增量用户列表失败'
+        console.error('Failed to fetch incremental user list:', err)
+        
+        // 如果增量更新失败，回退到全量更新
+        await fetchUserList()
+      } finally {
+        isLoading.value = false
+      }
+    }
     
 
     const initializeStore = async (): Promise<void> => {
@@ -117,16 +169,21 @@ export const useUserListStore = defineStore(
           people.value = storedData.people || []
           lasttime.value = storedData.lasttime || null
         }
+        
+        // 无论是否有存储数据，都检查更新
         await checkLasttimeAndUpdate()
       } catch (err) {
         console.error('Failed to initialize store:', err)
+        // 初始化失败时尝试获取全量数据
+        await fetchUserList()
       }
     }
 
     const saveToStorage = async (): Promise<void> => {
       try {
+        // 修改保存数据的部分
         const dataToStore: StoredUserListData = {
-          people: people.value,
+          people: JSON.parse(JSON.stringify(people.value)), // 深度克隆
           lasttime: lasttime.value
         }
         await userListStorage.setItem('userListData', dataToStore)

@@ -116,10 +116,12 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Toast, showFailToast, showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
-import apiClient from '@/plugins/axios';
+// 移除不再需要的引入
+// import apiClient from '@/plugins/axios';
 import lunisolar from 'lunisolar';
 import { Image as VanImage } from 'vant';
 import { useVirtualList } from '@vueuse/core'; // 引入虚拟列表
+import { useUserListStore } from '@/store/userList';
 
 // 定义 Person 接口
 interface Person {
@@ -145,11 +147,20 @@ interface Person {
 }
 
 // 定义 Filter 接口
+// 移除冗余的Person接口定义
+// interface Person {
+//   id: number;
+//   name: string;
+//   nickname?: string;
+//   ...
+// }
+
+// 保留必要的类型定义
 interface Filter {
   id: number;
   label: string;
   active: boolean;
-  type: 'location' | 'gender' | 'newbie' | string; // 根据实际情况调整
+  type: 'location' | 'gender' | 'newbie' | string;
   value?: string;
 }
 
@@ -335,52 +346,33 @@ const toggleFilter = (filter: Filter) => {
 
 // 加载用户数据
 const loadUserProfiles = async () => {
+  const userListStore = useUserListStore();
   try {
-    const response = await apiClient.get('/api/explore_people');
+    // await userListStore.fetchUserList();
     
-    // 直接使用后端返回的数据结构
-    allPeopleList.value = response.data.people.map((profile: any) => {
-      const birthDate = profile.birth_date ? new Date(profile.birth_date) : null;
-      const birthYear = birthDate ? birthDate.getFullYear() : undefined;
-      const zodiac = birthDate ? formatLunar(birthDate) : undefined;
-
-      return {
-        id: profile.id , // 如果没有ID，生成随机ID
-        name: profile.name || "", // 假设后端返回name字段
-        nickname: profile.nickname , // 使用name作为nickname，如果为空则显示编号
-        birthYear: birthYear,
-        zodiac: zodiac,
-        mem: profile.mem || '',
-        height: profile.height || 0,
-        gender: profile.gender || 'unknown',
-        region: profile.region_code || '未知地区',
-        occupation: profile.occupation || '未知职业',
-        education: profile.education || '未知学历',
-        mbti: profile.mbti || '未知性格',
-        avatar: profile.avatar || '',
-        photo: profile.photo || '',
-        liked: false,
-        isNew: false
-      };
-    });
+    allPeopleList.value = userListStore.formattedPeople.map(profile => ({
+      id: profile.id,
+      nickname: profile.nickname,
+      birthYear: new Date(profile.birth_date).getFullYear(),
+      zodiac: formatLunar(new Date(profile.birth_date)),
+      mem: profile.mem,
+      height: profile.height,
+      gender: profile.gender,
+      region: profile.region_code,
+      occupation: profile.occupation,
+      education: profile.education,
+      mbti: profile.mbti,
+      avatar: profile.avatar,
+      photo: profile.photo,
+      liked: false,
+      isNew: false
+    }));
     
-    // 初始化过滤列表
     filteredPeopleList.value = [...allPeopleList.value];
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('加载用户数据失败:', error);
-    
-    // 解析FastAPI的错误响应
-    let errorMessage = '加载数据失败';
-    if (error.response && error.response.data && error.response.data.detail) {
-      if (typeof error.response.data.detail === 'string') {
-        errorMessage = error.response.data.detail;
-      } else if (Array.isArray(error.response.data.detail)) {
-        errorMessage = error.response.data.detail.map((d: any) => d.msg).join('; ');
-      }
-    }
-    
-    showFailToast(errorMessage);
+    showFailToast('加载数据失败');
   }
 };
 

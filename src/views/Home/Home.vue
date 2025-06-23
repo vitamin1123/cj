@@ -122,6 +122,7 @@ import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/authStore';
 import { useUserInfoStore } from '@/store/userinfo'
+import { useUserListStore } from '@/store/userList'
 import apiClient from '@/plugins/axios';
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -134,6 +135,7 @@ import smileIcon from '@/assets/icons/smile.svg';
 import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 
 const userStore = useUserInfoStore()
+const userListStore = useUserListStore()
 const activeTab = ref('home');
 const router = useRouter();
 const isSearchFocused = ref(false);
@@ -160,7 +162,7 @@ const retryAuth = () => {
 
 onMounted(async() => {
   await checkAuth();
-  await userStore.fetchUserProfile();
+  await userListStore.initializeStore();
 });
 
 const handleSearchFocus = () => {
