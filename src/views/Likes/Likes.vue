@@ -17,7 +17,7 @@
       </div>
 
       <!-- 根据当前筛选显示不同内容 -->
-      <div class="likes-list" v-if="activeFilter === 'liked'">
+      <div class="likes-list" v-if="activeFilter === 'liked' && likedPeople.length > 0">
         <!-- 我喜欢的列表 -->
         <div v-for="person in likedPeople" :key="person.id" class="person-card">
           <div class="card-image"></div>
@@ -25,7 +25,7 @@
             <div class="name">{{ person.name }}</div>
             <div class="height-container">
               <div class="height">{{ person.height }}cm</div>
-              <div class="heart-icon" @click.stop="removeLike(person)">
+              <div class="heart-icon" @click.stop="confirmRemoveLike(person)">
                 <van-icon name="like" class="liked" />
               </div>
             </div>
@@ -35,7 +35,7 @@
         </div>
       </div>
 
-      <div class="likes-list" v-if="activeFilter === 'likedBy'">
+      <div class="likes-list" v-if="activeFilter === 'likedBy' && likedByPeople.length > 0">
         <!-- 喜欢我的列表 -->
         <div v-for="person in likedByPeople" :key="person.id" class="person-card">
           <div class="card-image"></div>
@@ -43,9 +43,7 @@
             <div class="name">{{ person.name }}</div>
             <div class="height-container">
               <div class="height">{{ person.height }}cm</div>
-              <div class="heart-icon" @click.stop="removeLike(person)">
-                <van-icon name="like" class="liked" />
-              </div>
+              <!-- 喜欢我的列表不显示红心 -->
             </div>
             <div class="desc">{{ person.desc }}</div>
             <div class="like-time">{{ person.likeTime }}</div>
@@ -54,11 +52,12 @@
       </div>
 
       <!-- 空状态 -->
-      <div class="empty-state" v-else>
+      <div class="empty-state" v-if="(activeFilter === 'liked' && likedPeople.length === 0) || (activeFilter === 'likedBy' && likedByPeople.length === 0)">
         <div class="empty-icon">
           <van-icon name="like" />
         </div>
-        <p class="empty-text">还没有喜欢的人</p>
+        <p class="empty-text" v-if="activeFilter === 'liked'">还没有喜欢的人</p>
+        <p class="empty-text" v-else>还没有人喜欢你</p>
         <p class="empty-desc">去寻觅页面看看吧</p>
         <van-button class="explore-btn" @click="goToExplore">去寻觅</van-button>
       </div>
@@ -77,6 +76,7 @@
 import { ref } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
+import { showConfirmDialog } from 'vant'; // 修正这里
 
 // 定义 LikedPerson 接口
 interface LikedPerson {
@@ -85,7 +85,6 @@ interface LikedPerson {
   height: number;
   desc: string;
   likeTime: string;
-  // 可以添加更多字段，如头像等
 }
 
 // 定义 Filter 接口
@@ -147,8 +146,21 @@ const likedByPeople = ref<LikedPerson[]>([
   { id: 8, name: '小强', height: 175, desc: '程序员', likeTime: '3天前' }
 ]);
 
+const confirmRemoveLike = (person: LikedPerson) => {
+  showConfirmDialog({
+    title: '确认取消喜欢',
+    message: `确定不再喜欢${person.name}吗？`,
+    confirmButtonColor: '#D75670',
+  })
+  .then(() => {
+    removeLike(person);
+  })
+  .catch(() => {
+    // 用户点击了取消
+  });
+};
+
 const removeLike = (person: LikedPerson) => {
-  // 根据 activeFilter 决定从哪个列表移除
   if (activeFilter.value === 'liked') {
     const index = likedPeople.value.findIndex(p => p.id === person.id);
     if (index > -1) {
@@ -202,6 +214,7 @@ const tabs = [
 </script>
 
 <style scoped>
+/* 保持所有样式不变 */
 .likes-container {
   background-color: #F2EEE8;
   min-height: 100vh;
@@ -334,8 +347,6 @@ const tabs = [
   padding: 12px 24px;
   font-size: 14px;
 }
-
-
 
 .filter-tags {
   display: flex;

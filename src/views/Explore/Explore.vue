@@ -32,6 +32,7 @@
                 <van-icon name="clear" class="clear-icon" @click="regionFilter = ''; handleSearch()" />
               </div>
             </div>
+            
           </div>
         </div>
       </div>
@@ -45,6 +46,30 @@
                 @click="toggleFilter(filter)">
             {{ filter.label }}
           </span>
+          <!-- 生肖筛选标签 -->
+          <span class="filter-tag" 
+                :class="{ active: isZodiacExpanded || selectedZodiacs.length > 0 }"
+                @click.stop="toggleZodiacDropdown">
+            生肖{{ selectedZodiacs.length > 0 ? '('+selectedZodiacs.length+')' : '' }}
+            <van-icon name="arrow-down" class="dropdown-icon" :class="{ rotated: isZodiacExpanded }" />
+          </span>
+        </div>
+        
+        <!-- 生肖下拉菜单 -->
+        <div class="zodiac-dropdown" v-if="isZodiacExpanded" @click.stop>
+          <div class="zodiac-grid">
+            <span v-for="zodiac in zodiacOptions" 
+                  :key="zodiac.value"
+                  class="zodiac-item"
+                  :class="{ selected: selectedZodiacs.includes(zodiac.value) }"
+                  @click="toggleZodiacSelection(zodiac.value)">
+              {{ zodiac.label }}
+            </span>
+          </div>
+          <div class="zodiac-actions">
+            <van-button size="small" @click="clearZodiacSelection">清空</van-button>
+            <van-button size="small" type="primary" @click="applyZodiacFilter">确定</van-button>
+          </div>
         </div>
       </div>
 
@@ -116,17 +141,21 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Toast, showFailToast, showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
+
+
 // 移除不再需要的引入
 // import apiClient from '@/plugins/axios';
 import lunisolar from 'lunisolar';
 import { Image as VanImage } from 'vant';
 import { useVirtualList } from '@vueuse/core'; // 引入虚拟列表
 import { useUserListStore } from '@/store/userList';
-
+lunisolar.config({
+  locale: 'cn' // 指定简体中文
+});
 // 定义 Person 接口
 interface Person {
   id: number; // 或者 string，根据后端返回确定
-  name: string;
+  name?: string;
   nickname?: string; // 新增昵称字段
   birthYear?: number; // 新增出生年份
   zodiac?: string; // 新增属相
@@ -164,6 +193,11 @@ interface Filter {
   value?: string;
 }
 
+interface ZodiacOption {
+  label: string;
+  value: string;
+}
+
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -180,11 +214,28 @@ const isSearchFocused = ref(false);
 const searchKeyword = ref('');
 const heightFilter = ref('');
 const regionFilter = ref('');
+const isZodiacExpanded = ref(false);
+const selectedZodiacs = ref<string[]>([]);
+
+// 生肖选项
+const zodiacOptions: ZodiacOption[] = [
+  { label: '鼠', value: '鼠' },
+  { label: '牛', value: '牛' },
+  { label: '虎', value: '虎' },
+  { label: '兔', value: '兔' },
+  { label: '龙', value: '龙' },
+  { label: '蛇', value: '蛇' },
+  { label: '马', value: '马' },
+  { label: '羊', value: '羊' },
+  { label: '猴', value: '猴' },
+  { label: '鸡', value: '鸡' },
+  { label: '狗', value: '狗' },
+  { label: '猪', value: '猪' }
+];
 
 // 两个列表：全部数据和过滤后的数据
 const allPeopleList = ref<Person[]>([]);
 const filteredPeopleList = ref<Person[]>([]);
-
 // 虚拟列表相关
 const container = ref<HTMLElement | null>(null);
 const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
@@ -217,6 +268,9 @@ const closeSearch = () => {
 
 // 点击页面其他区域关闭搜索框
 const handlePageClick = () => {
+  if (isZodiacExpanded.value) {
+    isZodiacExpanded.value = false;
+  }
   if (isSearchFocused.value) {
     closeSearch();
   }
@@ -255,8 +309,18 @@ const handleSearch = () => {
   
   // 区域筛选
   if (regionFilter.value.trim()) {
+              filtered = filtered.filter(person => {
+                // 同城判断：比较地区code前4位
+                const currentRegionCode = person.regionCode || '';
+                const filterRegionCode = regionFilter.value.trim();
+                return currentRegionCode.substring(0, 4) === filterRegionCode.substring(0, 4);
+              });
+            }
+  
+  // 生肖筛选
+  if (selectedZodiacs.value.length > 0) {
     filtered = filtered.filter(person => 
-    PinyinMatch.match(person.region || '', regionFilter.value.trim())
+      selectedZodiacs.value.includes(person.zodiac || '')
     );
   }
   
@@ -298,7 +362,7 @@ const filters = ref<Filter[]>([
   { id: 1, label: '同城', active: false, type: 'location' },
   { id: 2, label: '只看男', active: false, type: 'gender', value: 'male' },
   { id: 3, label: '只看女', active: false, type: 'gender', value: 'female' },
-  { id: 4, label: '新人', active: false, type: 'newbie' }
+  // { id: 4, label: '新人', active: false, type: 'newbie' }
 ]);
 
 // 性别筛选状态：0-取消选中，1-只看男，2-只看女
@@ -344,6 +408,60 @@ const toggleFilter = (filter: Filter) => {
   handleSearch();
 };
 
+// 切换生肖下拉菜单
+const toggleZodiacDropdown = () => {
+  isZodiacExpanded.value = !isZodiacExpanded.value;
+};
+
+// 切换生肖选择
+const toggleZodiacSelection = (zodiac: string) => {
+  const index = selectedZodiacs.value.indexOf(zodiac);
+  if (index === -1) {
+    selectedZodiacs.value.push(zodiac);
+  } else {
+    selectedZodiacs.value.splice(index, 1);
+  }
+};
+
+// 清空生肖选择
+const clearZodiacSelection = () => {
+  selectedZodiacs.value = [];
+};
+
+// 应用生肖筛选
+const applyZodiacFilter = () => {
+  isZodiacExpanded.value = false;
+  handleSearch();
+};
+
+type Zodiac = '鼠' | '牛' | '虎' | '兔' | '龍' | '蛇' | '馬' | '羊' | '猴' | '雞' | '狗' | '豬';
+const zodiacMapping: Record<Zodiac, string> = {
+  '鼠': '鼠', 
+  '牛': '牛',
+  '虎': '虎',
+  '兔': '兔',
+  '龍': '龙',
+  '蛇': '蛇',
+  '馬': '马',
+  '羊': '羊',
+  '猴': '猴',
+  '雞': '鸡',
+  '狗': '狗',
+  '豬': '猪'
+};
+const formatLunar = (date: Date | null): Zodiac => {
+  if (!date) return '鼠';
+  const zodiac = lunisolar(date).format('cZ');
+  
+  // 运行时验证
+  if (Object.keys(zodiacMapping).includes(zodiac)) {
+    return zodiac as Zodiac;
+  }
+  
+  // 处理意外情况
+  console.error(`Invalid zodiac: ${zodiac}`);
+  return '鼠';
+};
 // 加载用户数据
 const loadUserProfiles = async () => {
   const userListStore = useUserListStore();
@@ -354,14 +472,13 @@ const loadUserProfiles = async () => {
       id: profile.id,
       nickname: profile.nickname,
       birthYear: new Date(profile.birth_date).getFullYear(),
-      zodiac: formatLunar(new Date(profile.birth_date)),
+      zodiac: zodiacMapping[formatLunar(new Date(profile.birth_date))],
       mem: profile.mem,
       height: profile.height,
       gender: profile.gender,
       region: profile.region_code,
       occupation: profile.occupation,
       education: profile.education,
-      mbti: profile.mbti,
       avatar: profile.avatar,
       photo: profile.photo,
       liked: false,
@@ -376,10 +493,6 @@ const loadUserProfiles = async () => {
   }
 };
 
-const formatLunar = (date: Date | null) => {
-  if (!date) return '';
-  return lunisolar(date).format('cZ'); // 只返回属相
-};
 
 const toggleLike = (person: Person) => {
   person.liked = !person.liked;
@@ -561,6 +674,7 @@ onMounted(() => {
 /* 筛选标签 */
 .filter-section {
   margin-bottom: 16px;
+  position: relative;
 }
 
 .filter-tags {
@@ -568,6 +682,24 @@ onMounted(() => {
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
+  /* 添加滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: #D75670 #EBE3D7;
+}
+
+/* 自定义滚动条样式 */
+.filter-tags::-webkit-scrollbar {
+  height: 4px;
+}
+
+.filter-tags::-webkit-scrollbar-track {
+  background: #EBE3D7;
+  border-radius: 2px;
+}
+
+.filter-tags::-webkit-scrollbar-thumb {
+  background-color: #D75670;
+  border-radius: 2px;
 }
 
 .filter-tag {
@@ -579,11 +711,78 @@ onMounted(() => {
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.3s;
+  flex-shrink: 0; /* 防止标签被压缩 */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
 }
 
 .filter-tag.active {
   background-color: #D75670;
   color: white;
+}
+
+.dropdown-icon {
+  transition: transform 0.3s ease;
+  font-size: 12px;
+}
+
+.dropdown-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.selected-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background-color: #D75670;
+  color: white;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 生肖下拉菜单 */
+.zodiac-dropdown {
+  background-color: white;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.3s ease-out;
+  z-index: 20;
+}
+
+.zodiac-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.zodiac-item {
+  padding: 8px;
+  text-align: center;
+  border-radius: 16px;
+  background-color: #EBE3D7;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zodiac-item.selected {
+  background-color: #D75670;
+  color: white;
+}
+
+.zodiac-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 /* 人员卡片网格 */
@@ -604,6 +803,7 @@ onMounted(() => {
 }
 
 .card-image {
+  height: 180px;
   width: 120px; /* 固定图片宽度 */
   position: relative;
   flex-shrink: 0; /* 防止图片被压缩 */
@@ -742,7 +942,6 @@ onMounted(() => {
   color: #666;
   margin-top: 4px; /* 与上一行拉开距离 */
 }
-
 
 
 .highlight {

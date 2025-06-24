@@ -25,6 +25,7 @@
     "less": "^4.1.3",
     "localforage": "^1.10.0",
     "lunisolar": "^2.5.2",
+    "opencc-js": "^1.0.5",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.3.0",
     "pinyin-match": "^1.2.6",
