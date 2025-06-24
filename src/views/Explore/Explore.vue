@@ -8,12 +8,12 @@
           <div class="search-box">
             <t-icon name="search" class="search-icon" />
             <input 
-              type="text" 
+              type="search" 
               placeholder="搜索" 
               class="search-input" 
               v-model="searchKeyword"
               @focus="handleSearchFocus"
-              @input="handleSearch"
+              @keyup.enter="handleSearch"
             />
           </div>
           
@@ -138,7 +138,6 @@
 import { ref, computed, onMounted } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
 import { Toast, showFailToast, showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
 
@@ -149,6 +148,12 @@ import lunisolar from 'lunisolar';
 import { Image as VanImage } from 'vant';
 import { useVirtualList } from '@vueuse/core'; // 引入虚拟列表
 import { useUserListStore } from '@/store/userList';
+import { useUserInfoStore } from '@/store/userinfo';
+
+
+const userStore = useUserInfoStore();
+const currentUser = computed(() => userStore.profile);
+
 lunisolar.config({
   locale: 'cn' // 指定简体中文
 });
@@ -189,7 +194,7 @@ interface Filter {
   id: number;
   label: string;
   active: boolean;
-  type: 'location' | 'gender' | 'newbie' | string;
+  type: 'location' | 'gender' | 'zodiac' | string;
   value?: string;
 }
 
@@ -278,24 +283,85 @@ const handlePageClick = () => {
 
 // 搜索处理函数
 const handleSearch = () => {
+  // 从完整列表开始筛选
+  let filtered = [...allPeopleList.value];
+  
+  // 1. 生肖筛选（优先级最高）
+  if (selectedZodiacs.value.length > 0) {
+    filtered = filtered.filter(person => 
+      selectedZodiacs.value.includes(person.zodiac || '')
+    );
+  }
+
+  // 2. 性别筛选
+  const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
+  if (activeGenderFilter) {
+    filtered = filtered.filter(person => person.gender === activeGenderFilter.value);
+  }
+
+  // 3. 同城筛选（基于当前用户位置）
+  if (filters.value.find(f => f.type === 'location' && f.active) && currentUser.value?.region_code) {
+    const currentRegionPrefix = currentUser.value.region_code.substring(0, 4);
+    filtered = filtered.filter(person => 
+      person.region && person.region.substring(0, 4) === currentRegionPrefix
+    );
+  }
+
+  // 4. 身高筛选
+  if (heightFilter.value.trim()) {
+    const height = parseInt(heightFilter.value);
+    if (!isNaN(height)) {
+      filtered = filtered.filter(person => 
+        Math.abs(person.height - height) <= 5 // 允许±5cm误差
+      );
+    }
+  }
+
+  // 5. 区域筛选（基于输入值）
+  if (regionFilter.value.trim()) {
+    filtered = filtered.filter(person => {
+      const currentRegionCode = person.regionCode || '';
+      const filterRegionCode = regionFilter.value.trim();
+      return currentRegionCode.substring(0, 4) === filterRegionCode.substring(0, 4);
+    });
+  }
+
+  // 6. 关键词搜索（最后执行，只匹配mem字段）
+  const keyword = searchKeyword.value.trim();
+  if (keyword) {
+    filtered = filtered.filter(person => {
+      // 仅匹配mem字段
+      return PinyinMatch.match(person.mem || '', keyword) !== false;
+    });
+  }
+  
+  // 更新最终结果
+  filteredPeopleList.value = filtered;
+};
+
+const handleSearch_bak = () => {
   let filtered = [...allPeopleList.value];
   
   // 关键字搜索（使用pinyin-match）
-  if (searchKeyword.value.trim()) {
-    filtered = filtered.filter(person => {
-      const searchFields = [
-        person.name,
-        person.bio || '',
-        person.occupation || '',
-        person.region || '',
-        person.education || '',
-        person.mbti || ''
-      ].join(' ');
-      
-      // 确保 PinyinMatch.match 的参数类型正确
-      return PinyinMatch.match(searchFields, searchKeyword.value.trim());
-    });
+  console.log('searchKeyword',searchKeyword.value,PinyinMatch.match('张三', 'zs'))
+  const keyword = searchKeyword.value.trim();
+  if (!keyword) {
+    filteredPeopleList.value = [...allPeopleList.value];
+    return;
   }
+
+  filteredPeopleList.value = allPeopleList.value.filter(person => {
+    // 确保每个字段都是字符串，然后放入数组
+    const searchFields = [
+      String(person.occupation || ''),
+      String(person.mem || '')
+    ];
+    console.log('搜索字段内容:', searchFields);
+    // 检查每个字段是否匹配
+    return searchFields.some(text => {
+      return PinyinMatch.match(text, keyword) !== false;
+    });
+  });
   
   // 身高筛选
   if (heightFilter.value.trim()) {
@@ -316,6 +382,13 @@ const handleSearch = () => {
                 return currentRegionCode.substring(0, 4) === filterRegionCode.substring(0, 4);
               });
             }
+  // 同城筛选
+  if (filters.value.find(f => f.type === 'location' && f.active) && currentUser.value?.region_code) {
+    const currentRegionPrefix = currentUser.value.region_code.substring(0, 4);
+    filtered = filtered.filter(person => 
+      person.region && person.region.substring(0, 4) === currentRegionPrefix
+    );
+  }
   
   // 生肖筛选
   if (selectedZodiacs.value.length > 0) {
@@ -330,16 +403,32 @@ const handleSearch = () => {
     filtered = filtered.filter(person => person.gender === activeGenderFilter.value);
   }
   
-  const newbieFilter = filters.value.find(f => f.type === 'newbie');
-  if (newbieFilter && newbieFilter.active) {
-    filtered = filtered.filter(person => person.isNew);
-  }
+  
   
   filteredPeopleList.value = filtered;
 };
 
 // 高亮匹配文本
-const highlightText = (text: string | undefined, keyword: string): string => {
+const highlightText = (text: string = '', keyword: string = ''): string => {
+  if (!text || !keyword.trim()) return text;
+  
+  // 简单高效的匹配和高亮实现
+  const keywordLower = keyword.trim().toLowerCase();
+  const textLower = text.toLowerCase();
+  
+  // 直接文本匹配
+  const index = textLower.indexOf(keywordLower);
+  if (index === -1) return text;
+  
+  // 高亮匹配部分
+  const matchedText = text.substring(index, index + keyword.length);
+  return (
+    text.substring(0, index) +
+    `<span class="highlight">${matchedText}</span>` +
+    text.substring(index + keyword.length)
+  );
+};
+const highlightText_bak = (text: string | undefined, keyword: string): string => {
   if (!text || !keyword.trim()) return text || '';
   
   const matchResult = PinyinMatch.match(text, keyword.trim());
@@ -534,6 +623,7 @@ const tabs = [
 
 onMounted(() => {
   loadUserProfiles();
+  console.log('currentUser:', currentUser.value?.region_code.substring(0, 4))
 });
 </script>
 

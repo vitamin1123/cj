@@ -127,7 +127,7 @@ const user = ref<User>({
 });
 
 onMounted(() => {
-  fetchUserProfile();
+  // fetchUserProfile();
 });
 
 // 编辑头像
@@ -148,24 +148,24 @@ const editNickname = () => {
   });
 };
 
-const fetchUserProfile = async () => {
-  try {
-    const response = await apiClient.get('/api/getprofile');
-    const profileData = response.data;
+// const fetchUserProfile = async () => {
+//   try {
+//     const response = await apiClient.get('/api/getprofile');
+//     const profileData = response.data;
     
-    user.value = {
-      ...user.value,
-      nickname: profileData.nickname || '用户昵称',
-      avatarUrl: profileData.avatar_url || '',
-      likesCount: profileData.likesCount || 0,
-      likedByCount: profileData.likedByCount || 0,
-      recentVisitorsCount: profileData.recentVisitorsCount || 0,
-    };
-  } catch (error) {
-    console.error('获取用户资料失败', error);
-    showToast('获取用户资料失败');
-  }
-};
+//     user.value = {
+//       ...user.value,
+//       nickname: profileData.nickname || '用户昵称',
+//       avatarUrl: profileData.avatar_url || '',
+//       likesCount: profileData.likesCount || 0,
+//       likedByCount: profileData.likedByCount || 0,
+//       recentVisitorsCount: profileData.recentVisitorsCount || 0,
+//     };
+//   } catch (error) {
+//     console.error('获取用户资料失败', error);
+//     showToast('获取用户资料失败');
+//   }
+// };
 
 // 上传头像
 const handleAvatarChange = async (event: Event) => {

@@ -636,28 +636,59 @@ const formatDate = (date: Date) => {
 
 // 从store加载数据到表单
 const loadDataFromStore = () => {
-  if (!userStore.profile) return
+  if (!userStore.profile) return;
   
-  const profile = userStore.profile
-  formData.value.gender = profile.gender || ''
-  formData.value.birthDate = userStore.birthDateObj ?? new Date()
-  formData.value.height = profile.height ? String(profile.height) : ''
-  formData.value.weight = profile.weight ? String(profile.weight) : ''
-  formData.value.region = profile.region_code || ''
-  formData.value.regionCode = profile.region_code || '321282'
-  formData.value.occupation = profile.occupation || ''
-  formData.value.income = profile.income_level || ''
-  formData.value.education = profile.education || ''
-  formData.value.religion = profile.religion || ''
-  formData.value.mbti = profile.mbti || ''
-  formData.value.phone = profile.phone || ''
-  formData.value.bio = profile.mem || ''
-  formData.value.privateBio = profile.mem_pri || ''
+  const profile = userStore.profile;
+  formData.value.gender = profile.gender || '';
+  formData.value.birthDate = userStore.birthDateObj ?? new Date();
+  formData.value.height = profile.height ? String(profile.height) : '';
+  formData.value.weight = profile.weight ? String(profile.weight) : '';
+  
+  // 地区代码转换为地区名称
+  if (profile.region_code) {
+    formData.value.regionCode = profile.region_code;
+    // 查找对应的地区名称
+    const province = areaList.province_list[profile.region_code.substring(0, 2) + '0000'];
+    const city = areaList.city_list[profile.region_code.substring(0, 4) + '00'];
+    const district = areaList.county_list[profile.region_code];
+    
+    if (province && city && district) {
+      formData.value.region = `${province}-${city}-${district}`;
+    } else if (province && district) {
+      formData.value.region = `${province}-${district}`;
+    } else if (province) {
+      formData.value.region = province;
+    }
+  } else {
+    formData.value.region = '';
+    formData.value.regionCode = '321282';
+  }
+  
+  formData.value.occupation = profile.occupation || '';
+  formData.value.income = profile.income_level || '';
+  formData.value.education = profile.education || '';
+  
+  // 宗教值映射到显示文本
+  if (profile.religion) {
+    const religionOption = religionOptions.find(opt => opt.value === profile.religion);
+    if (religionOption) {
+      formData.value.religion = religionOption.value;
+      formData.value.religionText = religionOption.text;
+    }
+  } else {
+    formData.value.religion = '';
+    formData.value.religionText = '';
+  }
+  
+  formData.value.mbti = profile.mbti || '';
+  formData.value.phone = profile.phone || '';
+  formData.value.bio = profile.mem || '';
+  formData.value.privateBio = profile.mem_pri || '';
 
   if (userStore.formattedBirthDate) {
-    currentDate.value = [...userStore.formattedBirthDate]
+    currentDate.value = [...userStore.formattedBirthDate];
   }
-}
+};
 watch(() => userStore.profile, loadDataFromStore, { immediate: true })
 
 onMounted(() => {

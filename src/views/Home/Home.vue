@@ -163,6 +163,7 @@ const retryAuth = () => {
 onMounted(async() => {
   await checkAuth();
   await userListStore.initializeStore();
+  await userStore.fetchUserProfile()
 });
 
 const handleSearchFocus = () => {
