@@ -104,7 +104,7 @@
             </div>
             <div class="card-content">
               <div class="name-container">
-                <div class="name" v-html="highlightText(person.nickname && person.nickname.length > 7 ? person.nickname.substring(0, 7) + '...' : person.nickname || `${person.id}`, searchKeyword)"></div>
+                <div class="name" v-html="person.nickname && person.nickname.length > 7 ? person.nickname.substring(0, 7) + '...' : person.nickname || `${person.id}`"></div>
                 <div class="heart-icon" @click.stop="toggleLike(person)">
                   <van-icon name="like" :class="{ liked: person.liked }" />
                 </div>
@@ -113,12 +113,13 @@
                 <div class="height">{{ person.birthYear }}年 {{ person.zodiac }}</div>
               </div>
               <div class="info-row">
-                <div class="desc" v-html="highlightText(person.occupation || '未知职业', searchKeyword)"></div>
+                <div class="desc" v-html="person.occupation || '未知职业'"></div>
                 <div class="region">{{ person.height }}cm</div>
               </div>
-              <div class="mem">
+              <div class="mem" v-html="highlightMem(person.mem, person.id)"></div>
+              <!-- <div class="mem">
                 {{ person.mem.substring(0, 56)+'...' }}
-              </div>
+              </div> -->
             </div>
           </div>
         </div>
@@ -176,6 +177,7 @@ interface Person {
   isNew: boolean;
   avatar?: string;
   photo?: string;
+  memMatch?: [number, number];
   // 其他可能的字段
   [key: string]: any; // 允许其他动态字段，但尽量明确
 }
@@ -188,7 +190,8 @@ interface Person {
 //   nickname?: string;
 //   ...
 // }
-
+// 在组件中定义memMatchMap
+const memMatchMap = ref(new Map<number, [number, number]>());
 // 保留必要的类型定义
 interface Filter {
   id: number;
@@ -282,7 +285,98 @@ const handlePageClick = () => {
 };
 
 // 搜索处理函数
+// 搜索处理函数
 const handleSearch = () => {
+  const keyword = searchKeyword.value.trim();
+  const heightValue = heightFilter.value.trim();
+  const regionValue = regionFilter.value.trim();
+  // 清空之前的匹配位置
+  memMatchMap.value.clear();
+  // 提前计算筛选条件，避免在循环中重复计算
+  const hasZodiacFilter = selectedZodiacs.value.length > 0;
+  const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
+  const hasLocationFilter = filters.value.find(f => f.type === 'location' && f.active) && currentUser.value?.region_code;
+  const currentRegionPrefix = hasLocationFilter ? currentUser.value.region_code.substring(0, 4) : '';
+  
+  // 只遍历一次数组
+  filteredPeopleList.value = allPeopleList.value.filter(person => {
+    // 1. 生肖筛选
+    if (hasZodiacFilter && !selectedZodiacs.value.includes(person.zodiac || '')) {
+      return false;
+    }
+    
+    // 2. 性别筛选
+    if (activeGenderFilter && person.gender !== activeGenderFilter.value) {
+      return false;
+    }
+    
+    // 3. 同城筛选
+    if (hasLocationFilter) {
+      if (!person.region || person.region.substring(0, 4) !== currentRegionPrefix) {
+        return false;
+      }
+    }
+    
+    // 4. 身高筛选
+    if (heightValue) {
+      const height = parseInt(heightValue);
+      if (!isNaN(height) && Math.abs(person.height - height) > 5) {
+        return false;
+      }
+    }
+    
+    // 5. 区域筛选
+    if (regionValue) {
+      const currentRegionCode = person.regionCode || '';
+      if (currentRegionCode.substring(0, 4) !== regionValue.substring(0, 4)) {
+        return false;
+      }
+    }
+    
+    // 6. 关键词搜索（只匹配mem字段）
+    if (keyword) {
+      const match = PinyinMatch.match(person.mem || '', keyword);
+      if (match === false) {
+        return false;
+      }
+      
+      // 存储匹配位置
+      if (Array.isArray(match)) {
+        memMatchMap.value.set(person.id, match);
+      }
+      return true;
+    }
+    
+    // 如果所有条件都满足或者没有关键词搜索，则保留
+    return true;
+  });
+};
+
+const highlightMem = (text: string, id: number): string => {
+  if (!text) return '';
+  
+  // 截断文本
+  const truncatedText = text.length > 56 ? text.substring(0, 56) + '...' : text;
+  
+  // 获取匹配位置
+  const match = memMatchMap.value.get(id);
+  if (!match) return truncatedText;
+  
+  const [start, end] = match;
+  
+  // 确保匹配位置在截断范围内
+  const safeEnd = Math.min(end, truncatedText.length - 1);
+  if (start > safeEnd || start < 0) return truncatedText;
+  
+  // 分割文本并添加高亮
+  const before = truncatedText.substring(0, start);
+  const matched = truncatedText.substring(start, safeEnd + 1);
+  const after = truncatedText.substring(safeEnd + 1);
+  
+  return `${before}<span class="highlight">${matched}</span>${after}`;
+};
+
+const handleSearch_bak = () => {
   // 从完整列表开始筛选
   let filtered = [...allPeopleList.value];
   
@@ -339,112 +433,10 @@ const handleSearch = () => {
   filteredPeopleList.value = filtered;
 };
 
-const handleSearch_bak = () => {
-  let filtered = [...allPeopleList.value];
-  
-  // 关键字搜索（使用pinyin-match）
-  console.log('searchKeyword',searchKeyword.value,PinyinMatch.match('张三', 'zs'))
-  const keyword = searchKeyword.value.trim();
-  if (!keyword) {
-    filteredPeopleList.value = [...allPeopleList.value];
-    return;
-  }
 
-  filteredPeopleList.value = allPeopleList.value.filter(person => {
-    // 确保每个字段都是字符串，然后放入数组
-    const searchFields = [
-      String(person.occupation || ''),
-      String(person.mem || '')
-    ];
-    console.log('搜索字段内容:', searchFields);
-    // 检查每个字段是否匹配
-    return searchFields.some(text => {
-      return PinyinMatch.match(text, keyword) !== false;
-    });
-  });
-  
-  // 身高筛选
-  if (heightFilter.value.trim()) {
-    const height = parseInt(heightFilter.value);
-    if (!isNaN(height)) {
-      filtered = filtered.filter(person => 
-        Math.abs(person.height - height) <= 5 // 允许±5cm的误差
-      );
-    }
-  }
-  
-  // 区域筛选
-  if (regionFilter.value.trim()) {
-              filtered = filtered.filter(person => {
-                // 同城判断：比较地区code前4位
-                const currentRegionCode = person.regionCode || '';
-                const filterRegionCode = regionFilter.value.trim();
-                return currentRegionCode.substring(0, 4) === filterRegionCode.substring(0, 4);
-              });
-            }
-  // 同城筛选
-  if (filters.value.find(f => f.type === 'location' && f.active) && currentUser.value?.region_code) {
-    const currentRegionPrefix = currentUser.value.region_code.substring(0, 4);
-    filtered = filtered.filter(person => 
-      person.region && person.region.substring(0, 4) === currentRegionPrefix
-    );
-  }
-  
-  // 生肖筛选
-  if (selectedZodiacs.value.length > 0) {
-    filtered = filtered.filter(person => 
-      selectedZodiacs.value.includes(person.zodiac || '')
-    );
-  }
-  
-  // 应用其他筛选条件
-  const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
-  if (activeGenderFilter) {
-    filtered = filtered.filter(person => person.gender === activeGenderFilter.value);
-  }
-  
-  
-  
-  filteredPeopleList.value = filtered;
-};
 
-// 高亮匹配文本
-const highlightText = (text: string = '', keyword: string = ''): string => {
-  if (!text || !keyword.trim()) return text;
-  
-  // 简单高效的匹配和高亮实现
-  const keywordLower = keyword.trim().toLowerCase();
-  const textLower = text.toLowerCase();
-  
-  // 直接文本匹配
-  const index = textLower.indexOf(keywordLower);
-  if (index === -1) return text;
-  
-  // 高亮匹配部分
-  const matchedText = text.substring(index, index + keyword.length);
-  return (
-    text.substring(0, index) +
-    `<span class="highlight">${matchedText}</span>` +
-    text.substring(index + keyword.length)
-  );
-};
-const highlightText_bak = (text: string | undefined, keyword: string): string => {
-  if (!text || !keyword.trim()) return text || '';
-  
-  const matchResult = PinyinMatch.match(text, keyword.trim());
-  if (!matchResult) return text;
-  
-  // 简单的高亮实现
-  // 注意: keyword 可能包含正则表达式特殊字符，需要转义，或者使用更安全的高亮库
-  // 为简单起见，这里暂时不处理转义
-  try {
-    const regex = new RegExp(`(${keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, '<span class="highlight">$1</span>');
-  } catch (e) {
-    console.warn('Error creating regex for highlight:', e);
-    return text; // Fallback to original text if regex fails
-  }
-};
+
+
 
 // 修改筛选标签 - 支持多选独立模式
 const filters = ref<Filter[]>([
@@ -1031,11 +1023,18 @@ onMounted(() => {
   font-size: 14px;
   color: #666;
   margin-top: 4px; /* 与上一行拉开距离 */
+  color: #666 !important;
 }
 
 
 .highlight {
   color: #FF4D4F;
   font-weight: bold;
+}
+
+:global(.highlight) {
+  color: #FF4D4F !important;
+  font-weight: bold !important;
+  background-color: transparent !important;
 }
 </style>
