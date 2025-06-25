@@ -21,7 +21,11 @@
             <div class="search-option-item">
               <div class="option-label">身高</div>
               <div class="option-input">
-                <input type="text" placeholder="请输入身高" v-model="heightFilter" @input="handleSearch" />
+                <input type="number" 
+                  placeholder="请输入身高" 
+                  v-model="heightFilter" 
+                  @input="handleSearch"
+                />
                 <van-icon name="clear" class="clear-icon" @click="heightFilter = ''; handleSearch()" />
               </div>
             </div>
@@ -106,7 +110,7 @@
       </div>
 
       <!-- 人员卡片列表 - 使用虚拟列表 -->
-      <div class="people-grid"  v-bind="containerProps">
+      <div class="people-grid" v-bind="containerProps">
         <div v-bind="wrapperProps">
           <div v-for="{ index, data: person } in virtualList" :key="index" 
                class="person-card" 
@@ -211,38 +215,51 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated, onDeactivated, nextTick } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { Toast, showFailToast, showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
-
+import { useViewStateStore } from '@/store/viewState'; 
+import { storeToRefs } from 'pinia';
 
 // 移除不再需要的引入
 // import apiClient from '@/plugins/axios';
 import lunisolar from 'lunisolar';
 import { Image as VanImage } from 'vant';
 import { areaList } from '@vant/area-data';
-import { useVirtualList } from '@vueuse/core'; // 引入虚拟列表
+import { useVirtualList, useScroll } from '@vueuse/core'; // 引入虚拟列表
 import { useUserListStore } from '@/store/userList';
 import { useUserInfoStore } from '@/store/userinfo';
 
-
+const viewStateStore = useViewStateStore();
+const { exploreScrollPosition } = storeToRefs(viewStateStore);
+const { setExploreScrollPosition } = viewStateStore;
 const userStore = useUserInfoStore();
 const currentUser = computed(() => userStore.profile);
-
-
-
 const selectedAreaCode = ref(''); // 存储选择的区域代码
 const selectedAreaText = ref(''); // 存储选择的区域文本
 const showAreaPicker = ref(false);
+// 两个列表：全部数据和过滤后的数据
+const allPeopleList = ref<Person[]>([]);
+const filteredPeopleList = ref<Person[]>([]);
+// 虚拟列表相关
+// const container = ref<HTMLElement | null>(null);
+const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
+  filteredPeopleList,
+  {
+    itemHeight: 260,
+    overscan: 5
+  }
+);
+const peopleGridRef = containerProps.ref;
+// const scrollPosition = ref(0);
 
 const showBirthYearPicker = ref(false);
 const startYear = ref(['1980']); // 默认起始年份
 const endYear = ref(['2020']);   // 默认结束年份
 const minDate = new Date(1950, 0, 1);
 const maxDate = new Date(2025, 11, 31);
-
 // 计算生日年份显示文本
 const birthYearDisplay = computed(() => {
   if (startYear.value[0] && endYear.value[0]) {
@@ -346,15 +363,7 @@ interface Person {
   [key: string]: any; // 允许其他动态字段，但尽量明确
 }
 
-// 定义 Filter 接口
-// 移除冗余的Person接口定义
-// interface Person {
-//   id: number;
-//   name: string;
-//   nickname?: string;
-//   ...
-// }
-// 在组件中定义memMatchMap
+
 const memMatchMap = ref(new Map<number, [number, number]>());
 // 保留必要的类型定义
 interface Filter {
@@ -405,18 +414,8 @@ const zodiacOptions: ZodiacOption[] = [
   { label: '猪', value: '猪' }
 ];
 
-// 两个列表：全部数据和过滤后的数据
-const allPeopleList = ref<Person[]>([]);
-const filteredPeopleList = ref<Person[]>([]);
-// 虚拟列表相关
-const container = ref<HTMLElement | null>(null);
-const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
-  filteredPeopleList,
-  {
-    itemHeight: 260, // 每项高度（卡片高度 + 间距）
-    overscan: 5, // 预渲染的额外项数
-  }
-);
+
+
 
 // 获取人员图片URL
 const getPersonImage = (person: Person): string => {
@@ -452,7 +451,7 @@ const handlePageClick = () => {
 // 搜索处理函数
 const handleSearch = () => {
   const keyword = searchKeyword.value.trim();
-  const heightValue = heightFilter.value.trim();
+  const heightValue = heightFilter.value;
   const regionValue = regionFilter.value.trim();
   // 获取生日年份范围
   const startYearNum = parseInt(startYear.value[0]);
@@ -490,7 +489,7 @@ const handleSearch = () => {
     // 4. 身高筛选
     if (heightValue) {
       const height = parseInt(heightValue);
-      if (!isNaN(height) && Math.abs(person.height - height) > 5) {
+      if (!isNaN(height) && person.height < height) {
         return false;
       }
     }
@@ -554,62 +553,8 @@ const highlightMem = (text: string, id: number): string => {
   return `${before}<span class="highlight">${matched}</span>${after}`;
 };
 
-const handleSearch_bak = () => {
-  // 从完整列表开始筛选
-  let filtered = [...allPeopleList.value];
-  
-  // 1. 生肖筛选（优先级最高）
-  if (selectedZodiacs.value.length > 0) {
-    filtered = filtered.filter(person => 
-      selectedZodiacs.value.includes(person.zodiac || '')
-    );
-  }
 
-  // 2. 性别筛选
-  const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
-  if (activeGenderFilter) {
-    filtered = filtered.filter(person => person.gender === activeGenderFilter.value);
-  }
 
-  // 3. 同城筛选（基于当前用户位置）
-  if (filters.value.find(f => f.type === 'location' && f.active) && currentUser.value?.region_code) {
-    const currentRegionPrefix = currentUser.value.region_code.substring(0, 4);
-    filtered = filtered.filter(person => 
-      person.region && person.region.substring(0, 4) === currentRegionPrefix
-    );
-  }
-
-  // 4. 身高筛选
-  if (heightFilter.value.trim()) {
-    const height = parseInt(heightFilter.value);
-    if (!isNaN(height)) {
-      filtered = filtered.filter(person => 
-        Math.abs(person.height - height) <= 5 // 允许±5cm误差
-      );
-    }
-  }
-
-  // 5. 区域筛选（基于输入值）
-  if (regionFilter.value.trim()) {
-    filtered = filtered.filter(person => {
-      const currentRegionCode = person.regionCode || '';
-      const filterRegionCode = regionFilter.value.trim();
-      return currentRegionCode.substring(0, 4) === filterRegionCode.substring(0, 4);
-    });
-  }
-
-  // 6. 关键词搜索（最后执行，只匹配mem字段）
-  const keyword = searchKeyword.value.trim();
-  if (keyword) {
-    filtered = filtered.filter(person => {
-      // 仅匹配mem字段
-      return PinyinMatch.match(person.mem || '', keyword) !== false;
-    });
-  }
-  
-  // 更新最终结果
-  filteredPeopleList.value = filtered;
-};
 
 
 
@@ -790,10 +735,28 @@ const tabs = [
     to: '/userCenter'
   }
 ];
+const { y: liveScrollPosition } = useScroll(peopleGridRef, { throttle: 100 });
+onActivated(async () => {
+  console.log('ExploreView activated. Restoring scroll position from Pinia:', exploreScrollPosition.value);
+  
+  await nextTick();
+  
+  if (peopleGridRef.value) {
+    // 6. 从 Pinia state 恢复滚动位置
+    peopleGridRef.value.scrollTop = exploreScrollPosition.value;
+  }
+});
+
+onDeactivated(() => {
+  // 7. 在组件失活时，调用 action 将当前位置存入 Pinia
+  setExploreScrollPosition(liveScrollPosition.value);
+  console.log(`ExploreView deactivated. Saved scroll position to Pinia: ${liveScrollPosition.value}`);
+});
 
 onMounted(() => {
   loadUserProfiles();
-  console.log('currentUser:', currentUser.value?.region_code.substring(0, 4))
+  console.log('currentUser:', currentUser.value?.region_code.substring(0, 4));
+  console.log('onMounted triggered. peopleGridRef.value:', peopleGridRef.value);
 });
 </script>
 

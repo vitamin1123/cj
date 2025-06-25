@@ -14,7 +14,7 @@ import uuid
 from sqlalchemy import event, func
 from sqlalchemy.sql import text
 from sqlmodel import SQLModel, Field, create_engine, Session, select
-from datetime import datetime, timedelta, timezone  
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, field_validator
 from typing import Optional
 
@@ -134,7 +134,7 @@ def decode_jwt_token(token: str) -> dict:
 async def get_current_user(authorization: str = Header(...)) -> str:
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="缺少认证信息")
-    
+
     token = authorization.split(" ")[1]
     payload = decode_jwt_token(token)
     return payload.get("sub")
@@ -156,11 +156,11 @@ async def verify_wechat(
     """
     # 1. 将 token、timestamp、nonce 按字典序排序
     # params = sorted([WECHAT_TOKEN, timestamp, nonce])
-    
+
     # 2. 拼接字符串并 SHA1 加密
     # param_str = "".join(params).encode("utf-8")
     # calculated_signature = hashlib.sha1(param_str).hexdigest()
-    
+
     # 3. 校验签名
     # if calculated_signature == signature:
     #     # 必须返回 text/html 格式，否则微信会报 token check fail:cite[2]
@@ -177,7 +177,7 @@ async def wechat_callback(code: str, state: str = None):
     # 验证state
     # if state != EXPECTED_STATE:
     #     raise HTTPException(status_code=403, detail="Invalid state")
-    
+
     # 使用code获取openid
     result = await wechat_auth(code, state)
     openid = result["openid"]
@@ -193,7 +193,7 @@ async def wechat_auth(code: str, state: str = None):
     """前端通过code获取openid"""
     if not code:
         raise HTTPException(status_code=400, detail="缺少授权码")
-    
+
     # 向微信服务器请求access_token
     token_url = (
         f"https://api.weixin.qq.com/sns/oauth2/access_token"
@@ -202,22 +202,22 @@ async def wechat_auth(code: str, state: str = None):
         f"&code={code}"
         f"&grant_type=authorization_code"
     )
-    
+
     try:
         resp = requests.get(token_url)
         data = resp.json()
-        
+
         if "openid" not in data:
             raise HTTPException(
                 status_code=400,
                 detail=f"微信接口错误: {data.get('errmsg', '未知错误')}"
             )
-            
+
         return {
             "openid": data["openid"],
             "expires_in": data.get("expires_in", WECHAT_CONFIG["token_expire"])
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -249,9 +249,9 @@ async def add_profile(
             # 更新现有用户
             for key, value in profile_data.model_dump().items():
                 setattr(user, key, value)
-        
+
         session.commit()
-    
+
     return {"status": "success", "message": "资料保存成功"}
 
 @app.get("/getlasttime")
@@ -265,11 +265,11 @@ async def get_last_time():
             # 高效查询 (使用数据库索引)
             stmt = select(func.max(User.updated_at).label("max_time"))
             result = session.execute(stmt).scalar_one_or_none()
-            
+
             return {
                 "lasttime": result.isoformat() if result else None
             }
-            
+
         except Exception as e:
             raise HTTPException(
                 status_code=500,
@@ -279,19 +279,19 @@ async def get_last_time():
 
 @app.post("/upload-avatar")
 async def upload_avatar(
-    file: UploadFile = File(...), 
+    file: UploadFile = File(...),
     openid: str = Depends(get_current_user)
 ):
     # 验证文件类型
     content_type = file.content_type
     if not content_type or not content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="只能上传图片文件")
-    
+
     # 生成唯一文件名
     file_ext = os.path.splitext(file.filename)[1].lower()  # 获取扩展名并转为小写
     unique_filename = f"{uuid.uuid4().hex}{file_ext}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
-    
+
     # 保存文件并检查大小
     file_size = 0
     CHUNK_SIZE = 64 * 1024  # 64KB
@@ -310,7 +310,7 @@ async def upload_avatar(
         if os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
-    
+
     # 更新用户头像
     old_avatar = None
     try:
@@ -319,10 +319,10 @@ async def upload_avatar(
             if not user:
                 os.remove(file_path)
                 raise HTTPException(status_code=404, detail="用户不存在")
-            
+
             # 记录旧头像
             old_avatar = user.avatar
-            
+
             # 更新为新头像
             user.avatar = unique_filename
             session.add(user)
@@ -331,7 +331,7 @@ async def upload_avatar(
         # 数据库操作失败时删除新上传的文件
         os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"数据库更新失败: {str(e)}")
-    
+
     # 成功更新后删除旧头像
     if old_avatar:
         old_path = os.path.join(UPLOAD_DIR, old_avatar)
@@ -342,7 +342,7 @@ async def upload_avatar(
         except Exception as e:
             # 删除失败不影响主要操作，但应记录日志
             print(f"警告: 无法删除旧头像 {old_avatar}: {str(e)}")
-    
+
     # 返回头像URL
     avatar_url = f"/avatars/{unique_filename}"
     return {"avatar_url": avatar_url}
@@ -360,17 +360,28 @@ async def update_nickname(
     # 验证昵称长度
     if len(nickname) > 10:
         raise HTTPException(status_code=400, detail="昵称长度不能超过10个字符")
-    
+
     with Session(engine) as session:
         user = session.exec(select(User).where(User.openid == openid)).first()
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        
+
         user.nickname = nickname
         session.add(user)
         session.commit()
-    
+
     return {"status": "success", "message": "昵称更新成功"}
+
+@app.get("/getprofile")
+async def get_profile(
+    openid: str = Depends(get_current_user)
+):
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.openid == openid)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户资料未找到")
+        return user.model_dump(exclude={"openid"})
+
 
 @app.get("/explore_people")
 async def explore_people():
@@ -378,7 +389,7 @@ async def explore_people():
         try:
             # MySQL兼容的JSON查询
             stmt = text("""
-                SELECT 
+                SELECT
                     IFNULL(
                         (SELECT JSON_ARRAYAGG(
                             JSON_OBJECT(
@@ -402,14 +413,14 @@ async def explore_people():
                     MAX(updated_at) as lasttime
                 FROM user
             """)
-            
+
             result = session.execute(stmt).fetchone()
-            
+
             return {
                 "people": result[0] if result else [],
                 "lasttime": result[1].isoformat() if result and result[1] else None
             }
-            
+
         except Exception as e:
             print(f"Database error: {str(e)}")
             return {
@@ -455,7 +466,8 @@ async def explore_people_old():
             people_list.append(person_dict)
 
     return {"people": people_list}
-@app.get('/api/explore_people_updated')
+
+@app.get('/explore_people_updated')
 async def get_updated_people(since: str):
     with Session(engine) as session:
         stmt = select(User).where(User.updated_at > since)
@@ -464,5 +476,6 @@ async def get_updated_people(since: str):
             'people': [dict(u) for u in results],
             'lasttime': max(u.updated_at for u in results)
         }
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)

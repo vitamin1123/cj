@@ -64,7 +64,7 @@ const router = createRouter({
       path: '/explore',
       name: 'explore',
       component: () => import('@/views/Explore/Explore.vue'),
-      meta: { title: '寻觅' }
+      meta: { title: '寻觅' ,keepAlive: true }
     },
     {
       path: '/likes',
