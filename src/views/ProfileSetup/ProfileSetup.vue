@@ -439,11 +439,6 @@ const onReligionConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text:
 const onAreaConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
   // selectedOptions是一个数组，包含选中的省市区信息
   // 我的候选词是’‘，如果某个选项为’‘就不join空的，只join前面不为空的
-
-  
-
-
-
   const regionNames = selectedOptions.map(option => option.text).join('-');
   const regionCodes = selectedOptions.map(option => option.value);
   

@@ -28,10 +28,42 @@
             <div class="search-option-item">
               <div class="option-label">区域</div>
               <div class="option-input">
-                <input type="text" placeholder="请输入区域" v-model="regionFilter" @input="handleSearch" />
-                <van-icon name="clear" class="clear-icon" @click="regionFilter = ''; handleSearch()" />
+                <input 
+                  type="text" 
+                  placeholder="请选择区域" 
+                  readonly 
+                  :value="selectedAreaText"
+                  @click="showAreaPicker = true"
+                />
+                <van-icon 
+                  name="clear" 
+                  class="clear-icon" 
+                  @click.stop="clearAreaSelection" 
+                />
               </div>
             </div>
+
+            <div class="search-option-item">
+              <div class="option-label">生日年份</div>
+              <div class="option-input">
+                <input 
+                  type="text" 
+                  placeholder="选择年份范围" 
+                  readonly 
+                  :value="birthYearDisplay"
+                  @click="showBirthYearPicker = true"
+                />
+                <van-icon 
+                  name="clear" 
+                  class="clear-icon" 
+                  @click.stop="clearBirthYearFilter" 
+                />
+              </div>
+            </div>
+
+
+
+
             
           </div>
         </div>
@@ -125,7 +157,50 @@
         </div>
       </div>
     </div>
+    <van-popup 
+      v-model:show="showAreaPicker" 
+      position="bottom" 
+      round
+      teleport="body"
+    >
+      <van-area
+        title="选择区域"
+        :area-list="areaList"
+        @confirm="confirmAreaSelection"
+        @cancel="showAreaPicker = false"
+        :columns-placeholder="['', '', '']"
+      />
+    </van-popup>
 
+
+    <van-popup 
+      v-model:show="showBirthYearPicker" 
+      position="bottom" 
+      round
+      teleport="body"
+    >
+      <van-picker-group
+        title="选择生日年份范围"
+        :tabs="['起始年份', '结束年份']"
+        @confirm="confirmBirthYearRange"
+        @cancel="cancelBirthYearSelection"
+      >
+        <van-date-picker
+          v-model="startYear"
+          :columns-type="['year']"
+          :min-date="minDate"
+          :max-date="maxDate"
+          :formatter="yearFormatter"
+        />
+        <van-date-picker
+          v-model="endYear"
+          :columns-type="['year']"
+          :min-date="minDate"
+          :max-date="maxDate"
+          :formatter="yearFormatter"
+        />
+      </van-picker-group>
+    </van-popup>
     <!-- 底部TabBar      -->
     <TabBar 
       :active-tab="activeTab" 
@@ -147,6 +222,7 @@ import PinyinMatch from 'pinyin-match';
 // import apiClient from '@/plugins/axios';
 import lunisolar from 'lunisolar';
 import { Image as VanImage } from 'vant';
+import { areaList } from '@vant/area-data';
 import { useVirtualList } from '@vueuse/core'; // 引入虚拟列表
 import { useUserListStore } from '@/store/userList';
 import { useUserInfoStore } from '@/store/userinfo';
@@ -154,6 +230,94 @@ import { useUserInfoStore } from '@/store/userinfo';
 
 const userStore = useUserInfoStore();
 const currentUser = computed(() => userStore.profile);
+
+
+
+const selectedAreaCode = ref(''); // 存储选择的区域代码
+const selectedAreaText = ref(''); // 存储选择的区域文本
+const showAreaPicker = ref(false);
+
+const showBirthYearPicker = ref(false);
+const startYear = ref(['1980']); // 默认起始年份
+const endYear = ref(['2020']);   // 默认结束年份
+const minDate = new Date(1950, 0, 1);
+const maxDate = new Date(2025, 11, 31);
+
+// 计算生日年份显示文本
+const birthYearDisplay = computed(() => {
+  if (startYear.value[0] && endYear.value[0]) {
+    return `${startYear.value[0]} - ${endYear.value[0]}`;
+  }
+  return '选择年份范围';
+});
+
+const yearFormatter = (type: string, option: any) => {
+  if (type === 'year') {
+    option.text = option.text + '年';
+  }
+  return option;
+};
+
+// 区域选择确认处理
+const confirmAreaSelection = ({ selectedOptions }: { selectedOptions: Array<{ text: string; value: string }> }) => {
+  // 过滤掉无效的选项（text为空的）
+  const validOptions = selectedOptions.filter(option => 
+    option && option.text && option.text.trim() !== '' && option.value !== '000000'
+  );
+  
+  if (validOptions.length > 0) {
+    // 生成区域文本
+    selectedAreaText.value = validOptions.map(option => option.text).join('-');
+    
+    // 获取最后一级的有效选项
+    const lastValidOption = validOptions[validOptions.length - 1];
+    
+    // 根据选择的级别确定区域代码位数
+    if (validOptions.length === 1) {
+      // 只选择了省/直辖市：取前2位代码
+      selectedAreaCode.value = lastValidOption.value.substring(0, 2);
+    } else if (validOptions.length === 2) {
+      // 选择了省和市：取前4位代码
+      selectedAreaCode.value = lastValidOption.value.substring(0, 4);
+    } else {
+      // 选择了完整的省市区：取全部6位代码
+      selectedAreaCode.value = lastValidOption.value.substring(0, 6);
+    }
+  } else {
+    // 没有有效选择
+    selectedAreaText.value = '';
+    selectedAreaCode.value = '';
+  }
+  
+  showAreaPicker.value = false;
+  handleSearch();
+};
+
+// 清空区域选择
+const clearAreaSelection = () => {
+  selectedAreaCode.value = '';
+  selectedAreaText.value = '';
+  handleSearch();
+};
+
+// 确认生日年份范围
+const confirmBirthYearRange = () => {
+  showBirthYearPicker.value = false;
+  handleSearch();
+};
+
+// 取消选择
+const cancelBirthYearSelection = () => {
+  showBirthYearPicker.value = false;
+};
+
+// 清空生日年份筛选
+const clearBirthYearFilter = () => {
+  startYear.value = ['1980'];
+  endYear.value = ['2000'];
+  handleSearch();
+};
+
 
 lunisolar.config({
   locale: 'cn' // 指定简体中文
@@ -290,6 +454,10 @@ const handleSearch = () => {
   const keyword = searchKeyword.value.trim();
   const heightValue = heightFilter.value.trim();
   const regionValue = regionFilter.value.trim();
+  // 获取生日年份范围
+  const startYearNum = parseInt(startYear.value[0]);
+  const endYearNum = parseInt(endYear.value[0]);
+  
   // 清空之前的匹配位置
   memMatchMap.value.clear();
   // 提前计算筛选条件，避免在循环中重复计算
@@ -297,9 +465,11 @@ const handleSearch = () => {
   const activeGenderFilter = filters.value.find(f => f.type === 'gender' && f.active);
   const hasLocationFilter = filters.value.find(f => f.type === 'location' && f.active) && currentUser.value?.region_code;
   const currentRegionPrefix = hasLocationFilter ? currentUser.value.region_code.substring(0, 4) : '';
-  
+  const areaCode = selectedAreaCode.value;
+  console.log('selectedAreaCode-search:',areaCode)
   // 只遍历一次数组
   filteredPeopleList.value = allPeopleList.value.filter(person => {
+    
     // 1. 生肖筛选
     if (hasZodiacFilter && !selectedZodiacs.value.includes(person.zodiac || '')) {
       return false;
@@ -326,9 +496,17 @@ const handleSearch = () => {
     }
     
     // 5. 区域筛选
-    if (regionValue) {
-      const currentRegionCode = person.regionCode || '';
-      if (currentRegionCode.substring(0, 4) !== regionValue.substring(0, 4)) {
+    if (areaCode) {
+      // 检查用户区域代码是否以选择的区域代码为前缀
+      if (!person.region || !person.region.startsWith(areaCode)) {
+        return false;
+      }
+    }
+
+    // 0. 生日年份筛选
+    if (person.birthYear) {
+      const birthYear = person.birthYear;
+      if (birthYear < startYearNum || birthYear > endYearNum) {
         return false;
       }
     }
