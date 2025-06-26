@@ -1,9 +1,10 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
-import { useRouteHistoryStore } from '@/store/routeHistory';
+import type { App } from 'vue'
 import Result404 from '@/views/NotFound404View/NotFound404View.vue'
 import { useAuthStore } from '@/store/authStore'
 import axios from 'axios'
+import { setPreviousRoute } from '@/utils/routeHistory' 
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -109,29 +110,42 @@ const triggerWechatLogin = () => {
 }
 
 router.beforeEach((to, from, next) => {
-
   document.title = (to.meta?.title as string) ?? '自助功能'
 
-  if (to.path === '/reopen' || to.path === '/auth-success' || to.path === '/404') {
+  // 允许访问的白名单
+  if (['/reopen', '/auth-success', '/404'].includes(to.path)) {
     return next()
   }
 
   const authStore = useAuthStore()
   if (!authStore.token) {
-    
     const isWechat = /micromessenger/i.test(navigator.userAgent)
     
     if (!isWechat) {
-      
-      return next({ path: '/reopen', replace: true })
+      next({ path: '/reopen', replace: true })
     } else {
-      
+      // 保存当前路由作为"上一个路由"
+      setPreviousRoute(from)
+      // 触发微信登录
       triggerWechatLogin()
-      return 
+      // 不调用 next() 防止死锁
     }
+  } else {
+    next()
   }
+})
 
-  next()
+// 全局后置守卫记录路由历史
+router.afterEach((to, from) => {
+  // 排除不需要记录的路由
+  const excludeRoutes = ['/auth-success', '/reopen', '/404'];
+  
+  if (excludeRoutes.includes(from.path) || from.path === '/') {
+    return;
+  }
+  
+  // 保存上一个路由
+  setPreviousRoute(from)
 })
 
 export default router

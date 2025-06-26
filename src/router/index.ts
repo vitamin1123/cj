@@ -1,15 +1,17 @@
 // src/router/index.ts
-import { createRouter, createWebHistory } from 'vue-router'
-import type { App } from 'vue'
-import Result404 from '@/views/NotFound404View/NotFound404View.vue'
-import { useAuthStore } from '@/store/authStore'
-import axios from 'axios'
-import { setPreviousRoute } from '@/utils/routeHistory' 
+import { createRouter, createWebHistory } from 'vue-router';
+import type { App } from 'vue';
+import Result404 from '@/views/NotFound404View/NotFound404View.vue';
+import { useAuthStore } from '@/store/authStore';
+// import axios from 'axios' // 此行不再需要，axios配置已在plugins/axios.ts中封装
+import { setPreviousRoute } from '@/utils/routeHistory';
+// 导入我们新创建的微信授权工具函数
+import { triggerWechatLogin } from '@/utils/authUtils'; 
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-
+    // ... (保持现有路由配置不变)
     {
       path: '/auth-success',
       name: 'auth-success',
@@ -17,19 +19,13 @@ const router = createRouter({
         template: '<div style="padding: 20px; text-align: center;">授权成功，跳转中...</div>'
       },
       beforeEnter: (to, from, next) => {
-        
-        const token = to.query.token as string
-        if ( token) {
- 
-          
-          const authStore = useAuthStore()
-          
-          authStore.setToken(token)
-
-          next({ path: '/home', replace: true })
+        const token = to.query.token as string;
+        if (token) {
+          const authStore = useAuthStore();
+          authStore.setToken(token);
+          next({ path: '/home', replace: true });
         } else {
-          // 没有openid时强制跳转到提示页
-          next({ path: '/reopen', replace: true })
+          next({ path: '/reopen', replace: true });
         }
       }
     },
@@ -90,62 +86,46 @@ const router = createRouter({
       redirect: '/404'
     }
   ]
-})
+});
 
-// 配置axios基础URL
-axios.defaults.baseURL = 'http://www.tianshunchenjie.com'
-
-// 微信授权相关函数 - 确保立即跳转
-const triggerWechatLogin = () => {
-  const appId = 'wxccbf0238cab0a75c'
-  const backendUrl = 'http://www.tianshunchenjie.com'
-  const redirectUri = encodeURIComponent(`${backendUrl}/api/wechat/callback`)
-  const state = 'STATE_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8)
-  
-  const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
-  
-
-  
-  window.location.href = authUrl
-}
+// **删除这里原有的 axios.defaults.baseURL 和 triggerWechatLogin 函数定义**
+// 因为它们已经分别被 apiClient 封装和移动到 authUtils.ts
 
 router.beforeEach((to, from, next) => {
-  document.title = (to.meta?.title as string) ?? '自助功能'
+  document.title = (to.meta?.title as string) ?? '自助功能';
 
-  // 允许访问的白名单
+  // 允许访问的白名单路由
   if (['/reopen', '/auth-success', '/404'].includes(to.path)) {
-    return next()
+    return next();
   }
 
-  const authStore = useAuthStore()
+  const authStore = useAuthStore();
   if (!authStore.token) {
-    const isWechat = /micromessenger/i.test(navigator.userAgent)
+    const isWechat = /micromessenger/i.test(navigator.userAgent);
     
     if (!isWechat) {
-      next({ path: '/reopen', replace: true })
+      next({ path: '/reopen', replace: true });
     } else {
-      // 保存当前路由作为"上一个路由"
-      setPreviousRoute(from)
-      // 触发微信登录
-      triggerWechatLogin()
-      // 不调用 next() 防止死锁
+      // 保存当前路由作为"上一个路由"（可选，取决于你的路由历史逻辑）
+      setPreviousRoute(from);
+      // 调用从 authUtils.ts 导入的微信登录函数
+      triggerWechatLogin();
+      // 在此情况下不调用 next()，因为页面会直接重定向，防止死循环或重复导航
     }
   } else {
-    next()
+    next();
   }
-})
+});
 
 // 全局后置守卫记录路由历史
 router.afterEach((to, from) => {
-  // 排除不需要记录的路由
+  // ... (保持不变)
   const excludeRoutes = ['/auth-success', '/reopen', '/404'];
   
   if (excludeRoutes.includes(from.path) || from.path === '/') {
     return;
   }
-  
-  // 保存上一个路由
-  setPreviousRoute(from)
-})
+  setPreviousRoute(from);
+});
 
-export default router
+export default router;
