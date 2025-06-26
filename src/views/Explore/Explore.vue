@@ -1026,7 +1026,7 @@ onMounted(() => {
 }
 
 .card-image {
-  height: 180px;
+  height: 185px;
   width: 120px; /* 固定图片宽度 */
   position: relative;
   flex-shrink: 0; /* 防止图片被压缩 */

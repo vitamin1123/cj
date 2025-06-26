@@ -26,7 +26,7 @@ app = FastAPI()
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "81efd3fc-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_SECRET = "123213"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -42,7 +42,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "f50e7a202c919ec681ed82b79598673b",  # 请替换为您的正式AppSecret
+    "secret": "123123123123123123",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -183,8 +183,8 @@ async def wechat_callback(code: str, state: str = None):
     openid = result["openid"]
     # 生成JWT
     token = create_jwt_token(openid)
-    redirect_url = f"http://localhost:5173/auth-success?token={token}"
-    # redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
+    # redirect_url = f"http://localhost:5173/auth-success?token={token}"
+    redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
     print(f"Redirecting to: {redirect_url}")
     return RedirectResponse(url=redirect_url)
 
@@ -382,6 +382,18 @@ async def get_profile(
             raise HTTPException(status_code=404, detail="用户资料未找到")
         return user.model_dump(exclude={"openid"})
 
+@app.get("/user/{user_id}")
+async def get_user_by_id(
+    user_id: int,
+    openid: str = Depends(get_current_user)
+):
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.id == user_id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户未找到")
+
+        # 直接返回原始数据，不进行任何处理
+        return user.model_dump(exclude={"openid", "mem_pri", "phone"})
 
 @app.get("/explore_people")
 async def explore_people():

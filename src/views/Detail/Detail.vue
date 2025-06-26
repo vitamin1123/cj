@@ -197,7 +197,7 @@ const parseRegion = (code: string) => {
 const photoList = computed(() => {
   if (!userInfo.value.photo) return [];
   // 假设照片路径需要拼接服务器地址
-  const baseUrl = '/photos/'; 
+  const baseUrl = '/avatars/'; 
   return userInfo.value.photo.split(',')
     .filter((p: string) => p.trim())
     .map((p: string) => `${baseUrl}${p.trim()}`);
