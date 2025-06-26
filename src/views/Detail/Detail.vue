@@ -15,6 +15,7 @@
           <div v-else class="avatar"></div>
           <div class="basic-info">
             <h2 class="name">{{ userInfo.nickname || '未设置昵称' }}</h2>
+            <!-- 修改：确保年龄、身高、星座在同一行 -->
             <div class="info-row">
               <span class="birth-year">{{ displayBirthYear }}</span>
               <span class="height">{{ userInfo.height || '--' }}cm</span>
@@ -66,13 +67,38 @@
             <h3 class="mbti-title">{{ mbtiChineseName }}</h3>
             <p class="mbti-subtitle">{{ userInfo.mbti.toUpperCase() }}</p>
             <p class="mbti-description">{{ mbtiDescription }}</p>
-            <div class="mbti-tags">
-              <span v-for="(trait, index) in mbtiTraits" 
-                    :key="index" 
-                    class="mbti-tag"
-                    :class="'trait-' + index">
-                {{ trait.letter }} - {{ trait.name }}
-              </span>
+            <!-- 修改：重新设计MBTI展示为两行，去掉标题 -->
+            <div class="mbti-dimensions">
+              <!-- 第一行：外向/内向，直觉/实感 -->
+              <div class="dimension-row">
+                <div class="dimension">
+                  <div class="dimension-options">
+                    <span :class="['option', { active: mbtiFirstChar === 'E' }]">E外向</span>
+                    <span :class="['option', { active: mbtiFirstChar === 'I' }]">I内向</span>
+                  </div>
+                </div>
+                <div class="dimension">
+                  <div class="dimension-options">
+                    <span :class="['option', { active: mbtiSecondChar === 'N' }]">N直觉</span>
+                    <span :class="['option', { active: mbtiSecondChar === 'S' }]">S实感</span>
+                  </div>
+                </div>
+              </div>
+              <!-- 第二行：思考/情感，判断/感知 -->
+              <div class="dimension-row">
+                <div class="dimension">
+                  <div class="dimension-options">
+                    <span :class="['option', { active: mbtiThirdChar === 'T' }]">T思考</span>
+                    <span :class="['option', { active: mbtiThirdChar === 'F' }]">F情感</span>
+                  </div>
+                </div>
+                <div class="dimension">
+                  <div class="dimension-options">
+                    <span :class="['option', { active: mbtiFourthChar === 'J' }]">J计划</span>
+                    <span :class="['option', { active: mbtiFourthChar === 'P' }]">P随性</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -256,15 +282,21 @@ const mbtiDescription = computed(() => {
   return descMap[userInfo.value.mbti.toUpperCase()] || '富有洞察力与好奇心的思考者。';
 });
 
-const mbtiTraits = computed(() => {
-  if (!userInfo.value.mbti || userInfo.value.mbti.length !== 4) return [];
-  const mbti = userInfo.value.mbti.toUpperCase();
-  return [
-    { letter: mbti[0], name: mbti[0] === 'I' ? '内向' : '外向' },
-    { letter: mbti[1], name: mbti[1] === 'N' ? '直觉' : '实感' },
-    { letter: mbti[2], name: mbti[2] === 'T' ? '思考' : '情感' },
-    { letter: mbti[3], name: mbti[3] === 'P' ? '感知' : '判断' } // 修正: J是判断, P是感知
-  ];
+// 新增：提取MBTI的四个字符
+const mbtiFirstChar = computed(() => {
+  return userInfo.value.mbti?.charAt(0).toUpperCase() || '';
+});
+
+const mbtiSecondChar = computed(() => {
+  return userInfo.value.mbti?.charAt(1).toUpperCase() || '';
+});
+
+const mbtiThirdChar = computed(() => {
+  return userInfo.value.mbti?.charAt(2).toUpperCase() || '';
+});
+
+const mbtiFourthChar = computed(() => {
+  return userInfo.value.mbti?.charAt(3).toUpperCase() || '';
 });
 
 const getMbtiImage = (mbti: string) => {
@@ -477,18 +509,21 @@ onMounted(() => {
   flex: 1;
 }
 
+/* 修改：缩小名称字体 */
 .name {
-  font-size: 24px;
+  font-size: 22px; /* 从24px改为22px */
   font-weight: 500;
   color: #333;
   margin: 0 0 8px 0;
 }
 
-/* 确保年份、身高、星座在同一行 */
+/* 确保年份、身高、星座在同一行，缩小间距 */
 .info-row {
   display: flex;
-  flex-wrap: wrap; /* 换行 */
-  gap: 12px;
+  flex-wrap: nowrap; /* 禁止换行 */
+  gap: 8px; /* 从12px改为8px */
+  overflow-x: auto; /* 允许横向滚动 */
+  padding-bottom: 4px; /* 给滚动条留空间 */
 }
 
 .birth-year, .height, .constellation {
@@ -497,6 +532,7 @@ onMounted(() => {
   background-color: #F7F7F7;
   padding: 4px 10px;
   border-radius: 12px;
+  white-space: nowrap; /* 禁止文字换行 */
 }
 
 /* 通用区块标题 */
@@ -632,7 +668,6 @@ onMounted(() => {
   letter-spacing: 1px;
 }
 
-
 .mbti-description {
   font-size: 14px;
   color: #555;
@@ -641,51 +676,64 @@ onMounted(() => {
   min-height: 40px; /* 保证有足够空间 */
 }
 
-.mbti-tags {
-  display: flex; /* 使用flex布局 */
-  flex-wrap: wrap; /* 允许换行 */
-  gap: 10px; /* 增加间隙 */
-  margin-top: 10px;
+/* 修改：重新设计MBTI维度展示 */
+.mbti-dimensions {
+  margin-top: 20px;
 }
 
-.mbti-tag {
-  padding: 10px 14px; /* 增加内边距 */
+.dimension-row {
+  display: flex;
+  gap: 12px; /* 缩小间距 */
+  margin-bottom: 12px; /* 缩小行距 */
+}
+
+.dimension {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.7);
   border-radius: 16px;
-  font-size: 13px; /* 增大字体 */
-  font-weight: 500;
-  background-color: rgba(255, 255, 255, 0.7);
-  color: #333;
+  padding: 12px; /* 减少内边距 */
+  border: 1px solid rgba(0,0,0,0.05);
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-  text-align: center;
-  min-width: 80px; /* 设置最小宽度 */
-  flex: 1; /* 平均分配空间 */
-  white-space: nowrap; /* 防止换行 */
-  overflow: hidden;
-  text-overflow: ellipsis; /* 文本过长时显示省略号 */
+  min-height: 70px; /* 固定高度 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.mbti-tag:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+.dimension-options {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
 }
 
-/* MBTI特质颜色 - 橙蓝红紫 */
-.trait-0 { 
-  border-color: #FFB344; 
-  background-color: rgba(255, 179, 68, 0.1); 
-} /* 橙色 */
-.trait-1 { 
-  border-color: #4A9FF5; 
-  background-color: rgba(74, 159, 245, 0.1); 
-} /* 蓝色 */
-.trait-2 { 
-  border-color: #FF6B6B; 
-  background-color: rgba(255, 107, 107, 0.1); 
-} /* 红色 */
-.trait-3 { 
-  border-color: #9B59B6; 
-  background-color: rgba(155, 89, 182, 0.1); 
-} /* 紫色 */
+.option {
+  font-size: 13px; /* 缩小字体 */
+  font-weight: 400;
+  color: #999; /* 默认灰色 */
+  padding: 6px 8px; /* 调整内边距 */
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  white-space: nowrap; /* 防止文字换行 */
+}
+
+.option.active {
+  font-weight: bold;
+  color: #333; /* 激活状态深色 */
+  background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* 为不同维度设置不同的激活颜色 */
+.dimension:nth-child(1) .option.active {
+  color: #FFB344; /* 橙色 */
+}
+.dimension:nth-child(2) .option.active {
+  color: #4A9FF5; /* 蓝色 */
+}
+.dimension:nth-child(3) .option.active {
+  color: #FF6B6B; /* 红色 */
+}
+.dimension:nth-child(4) .option.active {
+  color: #9B59B6; /* 紫色 */
+}
 </style>
