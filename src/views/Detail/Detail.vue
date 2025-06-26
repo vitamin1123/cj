@@ -1,6 +1,5 @@
 <template>
   <div class="detail-container">
-    <!-- 返回按钮 -->
     <div class="header">
       <van-icon name="arrow-left" class="back-icon" @click="goBack" />
       <span class="header-title">详细信息</span>
@@ -9,64 +8,84 @@
       </div>
     </div>
 
-    <!-- 主要内容 -->
     <div class="content">
-      <!-- 头像和基本信息 -->
-      <div class="profile-card">
+      <div class="profile-card scroll-animate">
         <div class="avatar-section">
-          <div class="avatar"></div>
+          <img v-if="userInfo.avatar" :src="`/avatars/${userInfo.avatar}`" class="avatar" />
+          <div v-else class="avatar"></div>
           <div class="basic-info">
-            <h2 class="name">{{ userInfo.name }}</h2>
-            <div class="age-height">
-              <span class="age">{{ userInfo.age }}岁</span>
-              <span class="height">{{ userInfo.height }}cm</span>
+            <h2 class="name">{{ userInfo.nickname || '未设置昵称' }}</h2>
+            <div class="info-row">
+              <span class="birth-year">{{ displayBirthYear }}</span>
+              <span class="height">{{ userInfo.height || '--' }}cm</span>
+              <span class="constellation">{{ displayConstellation }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 详细信息标签 -->
-      <div class="info-section">
+      <div class="info-section scroll-animate">
         <h3 class="section-title">基本信息</h3>
         <div class="info-grid">
           <div class="info-item">
             <span class="label">职业</span>
-            <span class="value">{{ userInfo.occupation }}</span>
+            <span class="value">{{ userInfo.occupation || '未填写' }}</span>
           </div>
           <div class="info-item">
             <span class="label">学历</span>
-            <span class="value">{{ userInfo.education }}</span>
+            <span class="value">{{ displayEducation }}</span>
           </div>
           <div class="info-item">
+            <span class="label">宗教信仰</span>
+            <span class="value">{{ displayReligion }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">月收入</span>
+            <span class="value">{{ displayIncome }}</span>
+          </div>
+          <!-- 地区信息占据两列宽度 -->
+          <div class="info-item full-width">
             <span class="label">地区</span>
-            <span class="value">{{ userInfo.location }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">星座</span>
-            <span class="value">{{ userInfo.constellation }}</span>
+            <span class="value">{{ displayRegion }}</span>
           </div>
         </div>
       </div>
-
-      <!-- 兴趣爱好 -->
-      <div class="info-section">
-        <h3 class="section-title">兴趣爱好</h3>
-        <div class="tags">
-          <span v-for="hobby in userInfo.hobbies" :key="hobby" class="tag">{{ hobby }}</span>
-        </div>
-      </div>
-
-      <!-- 个人简介 -->
-      <div class="info-section">
+      
+      <div class="info-section scroll-animate" v-if="userInfo.mem">
         <h3 class="section-title">个人简介</h3>
-        <p class="description">{{ userInfo.description }}</p>
+        <p class="description">{{ userInfo.mem }}</p>
       </div>
 
-      <!-- 照片展示 -->
-      <div class="info-section">
-        <h3 class="section-title">照片</h3>
+      <div class="info-section scroll-animate" v-if="userInfo.mbti">
+        <h3 class="section-title">MBTI性格类型</h3>
+        <div class="mbti-card">
+          <div class="mbti-character-wrapper">
+            <img :src="getMbtiImage(userInfo.mbti)" class="mbti-character" />
+          </div>
+          <div class="mbti-content">
+            <h3 class="mbti-title">{{ mbtiChineseName }}</h3>
+            <p class="mbti-subtitle">{{ userInfo.mbti.toUpperCase() }}</p>
+            <p class="mbti-description">{{ mbtiDescription }}</p>
+            <div class="mbti-tags">
+              <span v-for="(trait, index) in mbtiTraits" 
+                    :key="index" 
+                    class="mbti-tag"
+                    :class="'trait-' + index">
+                {{ trait.letter }} - {{ trait.name }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-section scroll-animate" v-if="photoList.length > 0">
+        <h3 class="section-title">照片({{ photoList.length }})</h3>
         <div class="photo-grid">
-          <div v-for="i in 6" :key="i" class="photo-item"></div>
+          <img v-for="(photo, index) in photoList" 
+               :key="index" 
+               :src="photo.trim()" 
+               class="photo-item"
+               @click="previewPhoto(index)" />
         </div>
       </div>
     </div>
@@ -74,50 +93,303 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, computed } from 'vue';
+import { useRouter   } from 'vue-router';
+import { getPreviousRoute } from '@/utils/routeHistory';
+import { showImagePreview, showToast } from 'vant';
+import { areaList } from '@vant/area-data'; // 引入vant的地区数据
+import apiClient from '@/plugins/axios';
+
 
 const router = useRouter();
 const isLiked = ref(false);
+const userInfo = ref<Record<string, any>>({});
+// --- 数据转换映射表 ---
 
-// 模拟用户数据
-const userInfo = ref({
-  name: '张小美',
-  age: 25,
-  height: 165,
-  occupation: '设计师',
-  education: '本科',
-  location: '北京朝阳区',
-  constellation: '天秤座',
-  hobbies: ['旅行', '摄影', '美食', '读书', '瑜伽'],
-  description: '热爱生活，喜欢探索新鲜事物。工作之余喜欢旅行和摄影，记录生活中的美好瞬间。希望能遇到志同道合的朋友一起分享生活的点点滴滴。'
+// 收入水平 -> 中文名称 映射
+const incomeMap: Record<string, string> = {
+  'below_3k': '3千元以下',
+  '3k_5k': '3千-5千元',
+  '5k_8k': '5千-8千元',
+  '8k_12k': '8千-1.2万元',
+  '12k_20k': '1.2万-2万元',
+  'above_20k': '2万元以上'
+};
+
+// 学历 -> 中文名称 映射
+const educationMap: Record<string, string> = {
+  'high_school': '高中及以下',
+  'college': '大专',
+  'bachelor': '本科',
+  'master': '硕士',
+  'phd': '博士'
+};
+
+// 宗教 -> 中文名称 映射
+const religionMap: Record<string, string> = {
+  'buddhism': '佛教',
+  'christianity': '基督教',
+  'islam': '伊斯兰教',
+  'taoism': '道教',
+  'none': '无宗教信仰',
+  'other': '其他'
+};
+
+// 地区代码解析函数
+const parseRegion = (code: string) => {
+  if (!code) return '未填写';
+  
+  try {
+    // 省级代码 (前2位)
+    const provinceCode = code.substring(0, 2) + '0000';
+    // 市级代码 (前4位)
+    const cityCode = code.substring(0, 4) + '00';
+    
+    const province = areaList.province_list[provinceCode];
+    const city = areaList.city_list[cityCode];
+    const county = areaList.county_list[code];
+    
+    if (province && city && county) {
+      return `${province} ${city} ${county}`;
+    }
+    if (province && city) {
+      return `${province} ${city}`;
+    }
+    if (province) {
+      return province;
+    }
+    return '未知地区';
+  } catch (e) {
+    console.error('解析地区出错:', e);
+    return '未知地区';
+  }
+};
+
+// --- 计算属性 (Computed Properties) ---
+
+// 照片列表处理
+const photoList = computed(() => {
+  if (!userInfo.value.photo) return [];
+  // 假设照片路径需要拼接服务器地址
+  const baseUrl = '/photos/'; 
+  return userInfo.value.photo.split(',')
+    .filter((p: string) => p.trim())
+    .map((p: string) => `${baseUrl}${p.trim()}`);
 });
 
-const goBack = () => {
-  router.replace('/explore');
+// 显示处理后的地区
+const displayRegion = computed(() => {
+  return parseRegion(userInfo.value.region_code);
+});
+
+// 显示处理后的收入
+const displayIncome = computed(() => {
+  return incomeMap[userInfo.value.income_level] || '未填写';
+});
+
+// 显示处理后的学历
+const displayEducation = computed(() => {
+  return educationMap[userInfo.value.education] || '未填写';
+});
+
+// 显示处理后的宗教
+const displayReligion = computed(() => {
+  return religionMap[userInfo.value.religion] || '未填写';
+});
+
+// 出生年份显示
+const displayBirthYear = computed(() => {
+  if (!userInfo.value.birth_date) return '--';
+  try {
+    const date = new Date(userInfo.value.birth_date);
+    return isNaN(date.getTime()) ? '--' : date.getFullYear() + '年';
+  } catch {
+    return '--';
+  }
+});
+
+// 星座计算
+const displayConstellation = computed(() => {
+  if (!userInfo.value.birth_date) return '';
+  try {
+    const date = new Date(userInfo.value.birth_date);
+    if (isNaN(date.getTime())) return '';
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const constellations = [
+      { name: '摩羯座', start: [1, 20] }, { name: '水瓶座', start: [2, 19] },
+      { name: '双鱼座', start: [3, 21] }, { name: '白羊座', start: [4, 20] },
+      { name: '金牛座', start: [5, 21] }, { name: '双子座', start: [6, 22] },
+      { name: '巨蟹座', start: [7, 23] }, { name: '狮子座', start: [8, 23] },
+      { name: '处女座', start: [9, 23] }, { name: '天秤座', start: [10, 24] },
+      { name: '天蝎座', start: [11, 23] }, { name: '射手座', start: [12, 22] },
+    ];
+    for (let i = constellations.length - 1; i >= 0; i--) {
+        if (month > constellations[i].start[0] || (month === constellations[i].start[0] && day >= constellations[i].start[1])) {
+            return constellations[i].name;
+        }
+    }
+    return '摩羯座'; // 兜底
+  } catch {
+    return '';
+  }
+});
+
+// MBTI相关计算属性
+const mbtiChineseName = computed(() => {
+  if (!userInfo.value.mbti) return '';
+  const mbtiMap: Record<string, string> = {
+    'INTJ': '建筑师', 'INTP': '逻辑学家', 'ENTJ': '指挥官', 'ENTP': '辩论家',
+    'INFJ': '倡导者', 'INFP': '调停者', 'ENFJ': '主人公', 'ENFP': '竞选者',
+    'ISTJ': '物流师', 'ISFJ': '守卫者', 'ESTJ': '总经理', 'ESFJ': '执政官',
+    'ISTP': '鉴赏家', 'ISFP': '探险家', 'ESTP': '企业家', 'ESFP': '表演者'
+  };
+  return mbtiMap[userInfo.value.mbti.toUpperCase()] || userInfo.value.mbti;
+});
+
+const mbtiDescription = computed(() => {
+  if (!userInfo.value.mbti) return '';
+  const descMap: Record<string, string> = {
+    'INTP': '充满奇思妙想的革新者，对知识有着永不满足的渴望。',
+    // ... 可以补充其他类型的描述
+  };
+  return descMap[userInfo.value.mbti.toUpperCase()] || '富有洞察力与好奇心的思考者。';
+});
+
+const mbtiTraits = computed(() => {
+  if (!userInfo.value.mbti || userInfo.value.mbti.length !== 4) return [];
+  const mbti = userInfo.value.mbti.toUpperCase();
+  return [
+    { letter: mbti[0], name: mbti[0] === 'I' ? '内向' : '外向' },
+    { letter: mbti[1], name: mbti[1] === 'N' ? '直觉' : '实感' },
+    { letter: mbti[2], name: mbti[2] === 'T' ? '思考' : '情感' },
+    { letter: mbti[3], name: mbti[3] === 'P' ? '感知' : '判断' } // 修正: J是判断, P是感知
+  ];
+});
+
+const getMbtiImage = (mbti: string) => {
+  // 这里应该是你的MBTI人物图片路径, 请确保路径正确
+  return `/mbti-images/${mbti.toLowerCase()}.png`;
 };
 
+// --- 方法 (Methods) ---
+
+// 照片预览
+const previewPhoto = (index: number) => {
+  showImagePreview({
+    images: photoList.value,
+    startPosition: index,
+    closeable: true,
+  });
+};
+
+// 获取用户数据
+const fetchUserData = async () => {
+  try {
+    const userId = router.currentRoute.value.params.id;
+    const response = await apiClient.get(`/api/user/${userId}`);
+    
+    // **注意**: 此处为了演示，直接使用您提供的静态数据。
+    // 在实际项目中，您应该注释掉下面的代码，并取消上面API调用的注释。
+    // const mockResponse = {
+    //   data: {"occupation":"教师","avatar":"9.jpg","id":9426,"income_level":"below_3k","photo":"45649.jpg,37706.jpg,41582.jpg,39962.jpg,20231.jpg,16101.jpg,54648.jpg,35604.jpg","education":"bachelor","created_at":"2025-05-20T17:16:58","nickname":"果断蚯蚓82","religion":"none","updated_at":"2025-06-20T00:20:19","birth_date":"2009-06-01T00:00:00","mbti":"INTP","height":185,"gender":"male","weight":72.0,"mem":"来自农村，通过自己努力在城市立足。温和善良，注重家庭，希望未来能组建一个温馨的家庭。希望对方性格温柔，善解人意，有稳定工作。","region_code":"310104"}
+    // };
+    
+    if (response.data) {
+      userInfo.value = response.data;
+    } else {
+      showToast('用户数据为空');
+    }
+  } catch (error: any) {
+    console.error('获取用户数据失败:', error);
+    showToast(error?.response?.data?.detail || '加载用户信息失败');
+  }
+};
+
+// 返回上一页
+const goBack = () => {
+  const previousRoute = getPreviousRoute();
+  
+  if (previousRoute) {
+    // 使用 replace 方法返回上一个页面
+    router.replace({
+      path: previousRoute.path,
+      query: previousRoute.query,
+      params: previousRoute.params
+    });
+  } else {
+    // 如果没有历史记录，则返回首页
+    router.replace('/home');
+  }
+};
+
+// 点赞功能
 const toggleLike = () => {
   isLiked.value = !isLiked.value;
+  showToast(isLiked.value ? '已喜欢' : '取消喜欢');
+  // 这里可以添加实际的点赞API调用
 };
+
+
+// --- 生命周期钩子 (Lifecycle Hooks) ---
+
+onMounted(() => {
+  fetchUserData();
+
+  // 设置滚动动画监听
+  // IntersectionObserver是一个现代API，用于观察元素是否进入视口
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        // 当元素进入视口时
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          // (可选) 动画触发后停止观察，以提高性能
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    {
+      rootMargin: '0px', // 视口的外边距
+      threshold: 0.1,   // 元素可见度达到10%时触发
+    }
+  );
+
+  // 延迟一小段时间，确保DOM元素已渲染
+  setTimeout(() => {
+    const elementsToAnimate = document.querySelectorAll('.scroll-animate');
+    elementsToAnimate.forEach((el) => {
+      observer.observe(el);
+    });
+  }, 100);
+});
+
 </script>
 
 <style scoped>
+/* 全局容器和字体设置 */
 .detail-container {
   background-color: #F2EEE8;
   min-height: 100vh;
+  /* 字体保持不变 */
   font-family: "Microsoft YaHei", sans-serif;
 }
 
+/* 吸顶头部 */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px;
   background-color: #F2EEE8;
+  /* 吸顶关键属性 */
   position: sticky;
   top: 0;
   z-index: 10;
+  /* 添加一点底部模糊，增强层次感 */
+  backdrop-filter: blur(5px);
+  background-color: rgba(242, 238, 232, 0.8);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
 .back-icon {
@@ -138,29 +410,57 @@ const toggleLike = () => {
 .heart-icon {
   font-size: 24px;
   color: #ccc;
-  transition: color 0.3s;
+  transition: color 0.3s ease, transform 0.3s ease;
 }
 
 .heart-icon.liked {
   color: #ff4757;
+  transform: scale(1.1);
 }
 
+/* 内容区域 */
 .content {
-  padding: 0 16px 16px;
+  padding: 8px 16px 24px;
 }
 
-.profile-card {
+/* --- 滚动出现动画 --- */
+.scroll-animate {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+              transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* 为后续卡片添加入场延迟，营造错落感 */
+.scroll-animate:nth-child(2) { transition-delay: 0.1s; }
+.scroll-animate:nth-child(3) { transition-delay: 0.2s; }
+.scroll-animate:nth-child(4) { transition-delay: 0.3s; }
+
+.scroll-animate.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 通用卡片基类 */
+.info-section, .profile-card {
   background-color: #FFFFFF;
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 16px; /* 更大的圆角 */
+  padding: 24px;
   margin-bottom: 16px;
-  border: 1px solid #D9D9D9;
+  border: 1px solid rgba(217, 217, 217, 0.5); /* 边框更柔和 */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05); /* 更柔和的阴影 */
+  overflow: hidden; /* 防止内部元素溢出 */
+}
+
+/* 个人信息卡片 (顶层) */
+.profile-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fdfcfb 100%);
 }
 
 .avatar-section {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
 .avatar {
@@ -168,6 +468,9 @@ const toggleLike = () => {
   height: 80px;
   border-radius: 50%;
   background-color: #D9D9D9;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .basic-info {
@@ -181,83 +484,208 @@ const toggleLike = () => {
   margin: 0 0 8px 0;
 }
 
-.age-height {
+/* 确保年份、身高、星座在同一行 */
+.info-row {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap; /* 换行 */
+  gap: 12px;
 }
 
-.age, .height {
+.birth-year, .height, .constellation {
   font-size: 16px;
   color: #6A6A6A;
-}
-
-.info-section {
-  background-color: #FFFFFF;
+  background-color: #F7F7F7;
+  padding: 4px 10px;
   border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 16px;
-  border: 1px solid #D9D9D9;
 }
 
+/* 通用区块标题 */
 .section-title {
   font-size: 18px;
   font-weight: 500;
   color: #333;
-  margin: 0 0 16px 0;
+  margin: 0 0 20px 0;
+  position: relative;
+  padding-left: 14px;
 }
 
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 18px;
+  width: 5px;
+  background-color: #D9CBBF; /* 调整为更匹配的颜色 */
+  border-radius: 3px;
+}
+
+/* 信息网格 */
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 20px 16px;
 }
 
 .info-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+}
+
+/* 地区信息占据两列宽度 */
+.info-item.full-width {
+  grid-column: span 2;
 }
 
 .label {
   font-size: 14px;
-  color: #6A6A6A;
+  color: #888; /* 标签颜色变浅 */
 }
 
 .value {
   font-size: 16px;
   color: #333;
+  font-weight: 500;
 }
 
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag {
-  background-color: #EBE3D7;
-  color: #333;
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 14px;
-}
-
+/* 个人简介 */
 .description {
   font-size: 16px;
-  color: #333;
-  line-height: 1.6;
+  color: #444;
+  line-height: 1.8; /* 增加行高，提升可读性 */
   margin: 0;
 }
 
+/* 照片墙 */
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* 自适应列 */
+  gap: 12px;
 }
 
 .photo-item {
   aspect-ratio: 1;
   background-color: #D9D9D9;
-  border-radius: 8px;
+  border-radius: 12px;
+  object-fit: cover;
+  width: 100%;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
 }
+
+.photo-item:hover {
+  transform: scale(1.05); /* 悬浮放大效果 */
+  box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}
+
+/* MBTI卡片样式 */
+.mbti-card {
+  position: relative;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e6e9f0 100%);
+  border-radius: 12px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.mbti-character-wrapper {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  z-index: 1;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,0.15));
+  transform: translateY(0) rotate(0);
+  transition: transform 0.4s ease-out;
+}
+
+.mbti-card:hover .mbti-character-wrapper {
+  transform: translateY(-8px) rotate(5deg);
+}
+
+.mbti-character {
+  height: 120px;
+  object-fit: contain;
+}
+
+.mbti-content {
+  position: relative;
+  z-index: 2;
+  max-width: 70%;
+}
+
+.mbti-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+}
+
+/* 新增：MBTI原始类型小字 */
+.mbti-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #7f8c8d;
+  margin: 4px 0 12px 0;
+  letter-spacing: 1px;
+}
+
+
+.mbti-description {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+  min-height: 40px; /* 保证有足够空间 */
+}
+
+.mbti-tags {
+  display: flex; /* 使用flex布局 */
+  flex-wrap: wrap; /* 允许换行 */
+  gap: 10px; /* 增加间隙 */
+  margin-top: 10px;
+}
+
+.mbti-tag {
+  padding: 10px 14px; /* 增加内边距 */
+  border-radius: 16px;
+  font-size: 13px; /* 增大字体 */
+  font-weight: 500;
+  background-color: rgba(255, 255, 255, 0.7);
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  text-align: center;
+  min-width: 80px; /* 设置最小宽度 */
+  flex: 1; /* 平均分配空间 */
+  white-space: nowrap; /* 防止换行 */
+  overflow: hidden;
+  text-overflow: ellipsis; /* 文本过长时显示省略号 */
+}
+
+.mbti-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* MBTI特质颜色 - 橙蓝红紫 */
+.trait-0 { 
+  border-color: #FFB344; 
+  background-color: rgba(255, 179, 68, 0.1); 
+} /* 橙色 */
+.trait-1 { 
+  border-color: #4A9FF5; 
+  background-color: rgba(74, 159, 245, 0.1); 
+} /* 蓝色 */
+.trait-2 { 
+  border-color: #FF6B6B; 
+  background-color: rgba(255, 107, 107, 0.1); 
+} /* 红色 */
+.trait-3 { 
+  border-color: #9B59B6; 
+  background-color: rgba(155, 89, 182, 0.1); 
+} /* 紫色 */
 </style>
