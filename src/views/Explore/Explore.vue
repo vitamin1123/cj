@@ -222,7 +222,7 @@ import { Toast, showFailToast, showSuccessToast } from 'vant';
 import PinyinMatch from 'pinyin-match';
 import { useViewStateStore } from '@/store/viewState'; 
 import { storeToRefs } from 'pinia';
-
+import { likeUser } from '@/api/like';
 // 移除不再需要的引入
 // import apiClient from '@/plugins/axios';
 import lunisolar from 'lunisolar';
@@ -698,8 +698,19 @@ const loadUserProfiles = async () => {
 };
 
 
-const toggleLike = (person: Person) => {
-  person.liked = !person.liked;
+const toggleLike = async (person: Person) => {
+  try {
+    const action = person.liked ? 'unlike' : 'like';
+    await likeUser(person.id, action);
+    
+    // 本地更新状态（避免重新请求）
+    person.liked = !person.liked;
+    
+    showSuccessToast(person.liked ? '已喜欢' : '已取消');
+  } catch (error) {
+    console.error('操作失败:', error);
+    showFailToast('操作失败');
+  }
 };
 
 const goToDetail = (id: number | string) => {

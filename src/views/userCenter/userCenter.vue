@@ -79,11 +79,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted  } from 'vue';
+import { ref, nextTick, onMounted, computed  } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { Toast, showToast  } from 'vant';
 import apiClient from '@/plugins/axios';
+import { useUserInfoStore } from '@/store/userinfo';
+
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -117,13 +119,17 @@ const avatarInput = ref<HTMLInputElement>();
 const nicknameInput = ref<HTMLInputElement>();
 const isEditingNickname = ref(false);
 const tempNickname = ref('');
+const userInfoStore = useUserInfoStore();
 
-const user = ref<User>({
-  nickname: '用户昵称',
-  avatarUrl: '', // 初始为空或默认头像
-  likesCount: 12,
-  likedByCount: 5,
-  recentVisitorsCount: 20,
+// 从store中获取用户信息
+const user = computed(() => {
+  return {
+    nickname: userInfoStore.profile?.nickname || '用户昵称',
+    avatarUrl: userInfoStore.profile?.avatar_url || '',
+    // likesCount: userInfoStore.profile?.mem?.likesCount || 12,
+    // likedByCount: userInfoStore.profile?.mem?.likedByCount || 5,
+    // recentVisitorsCount: userInfoStore.profile?.mem?.recentVisitorsCount || 20,
+  };
 });
 
 onMounted(() => {
@@ -200,8 +206,9 @@ const handleAvatarChange = async (event: Event) => {
       });
       
       // 更新头像URL为服务器返回的URL
-      user.value.avatarUrl = response.data.avatar_url;
+      // user.value.avatarUrl = response.data.avatar_url;
       showToast('头像更新成功');
+      await userInfoStore.fetchUserProfile();
     } catch (error) {
       console.error('头像上传失败', error);
       showToast('头像上传失败');
@@ -223,6 +230,7 @@ const saveNickname = async () => {
       
       user.value.nickname = tempNickname.value.trim();
       showToast('昵称更新成功');
+      await userInfoStore.fetchUserProfile();
     } catch (error) {
       console.error('昵称更新失败', error);
       showToast('昵称更新失败');

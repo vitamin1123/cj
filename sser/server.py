@@ -13,6 +13,7 @@ import os
 import uuid
 from sqlalchemy import event, func
 from sqlalchemy.sql import text
+from sqlalchemy.future import delete
 from sqlmodel import SQLModel, Field, create_engine, Session, select
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, field_validator
@@ -26,7 +27,7 @@ app = FastAPI()
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "123213"  # 替换为强密钥
+JWT_SECRET = "812312323-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -42,7 +43,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "123123123123123123",  # 请替换为您的正式AppSecret
+    "secret": "123123123213213",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -183,8 +184,8 @@ async def wechat_callback(code: str, state: str = None):
     openid = result["openid"]
     # 生成JWT
     token = create_jwt_token(openid)
-    # redirect_url = f"http://localhost:5173/auth-success?token={token}"
-    redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
+    redirect_url = f"http://localhost:5173/auth-success?token={token}"
+    #redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
     print(f"Redirecting to: {redirect_url}")
     return RedirectResponse(url=redirect_url)
 
@@ -439,6 +440,62 @@ async def explore_people():
                 "people": [],
                 "lasttime": None
             }
+# select liker_id,liked_id,created_at from cj.user_likes;
+# select target_id,visitor_id,created_at from user_visits;
+#
+# 在User模型后添加UserLike模型
+class UserLike(SQLModel, table=True):
+    liker_id: int = Field(primary_key=True, foreign_key="user.id")
+    liked_id: int = Field(primary_key=True, foreign_key="user.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(beijing_tz))
+
+# 点赞请求模型
+class LikeRequest(BaseModel):
+    liked_id: int
+    action: str  # "like" or "unlike"
+
+@app.post("/like")
+async def handle_like(
+    like_request: LikeRequest,
+    openid: str = Depends(get_current_user)
+):
+    with Session(engine) as session:
+        # 1. 获取当前用户ID（修正查询方式）
+        stmt = select(User.id).where(User.openid == openid)
+        current_user_id = session.exec(stmt).scalar()  # 使用 scalar() 代替 scalar_one()
+        
+        if current_user_id is None:
+            raise HTTPException(status_code=404, detail="用户不存在")
+            
+        liker_id = current_user_id
+        liked_id = like_request.liked_id
+        
+        # 2. 处理点赞操作
+        if like_request.action == "like":
+            try:
+                # 尝试插入点赞记录
+                new_like = UserLike(
+                    liker_id=liker_id,
+                    liked_id=liked_id
+                )
+                session.add(new_like)
+                session.commit()
+                return {"status": "success", "message": "点赞成功"}
+            except Exception as e:
+                # 处理唯一约束冲突（已点赞的情况）
+                session.rollback()
+                return {"status": "success", "message": "已点赞"}
+            
+        elif like_request.action == "unlike":
+            # 执行取消点赞操作
+            result = session.exec(
+                delete(UserLike).where(
+                    UserLike.liker_id == liker_id,
+                    UserLike.liked_id == liked_id
+                )
+            )
+            session.commit()
+            return {"status": "success", "message": "取消点赞成功"}
 
 @app.get("/explore_people_old")
 async def explore_people_old():

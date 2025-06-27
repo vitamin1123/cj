@@ -125,7 +125,7 @@ import { getPreviousRoute } from '@/utils/routeHistory';
 import { showImagePreview, showToast } from 'vant';
 import { areaList } from '@vant/area-data'; // 引入vant的地区数据
 import apiClient from '@/plugins/axios';
-
+import { likeUser } from '@/api/like';
 
 const router = useRouter();
 const isLiked = ref(false);
@@ -355,13 +355,21 @@ const goBack = () => {
   }
 };
 
-// 点赞功能
-const toggleLike = () => {
-  isLiked.value = !isLiked.value;
-  showToast(isLiked.value ? '已喜欢' : '取消喜欢');
-  // 这里可以添加实际的点赞API调用
-};
 
+
+const toggleLike = async () => {
+  try {
+    const userId = parseInt(router.currentRoute.value.params.id as string);
+    const action = isLiked.value ? 'unlike' : 'like';
+    await likeUser(userId, action);
+    
+    isLiked.value = !isLiked.value;
+    showToast(isLiked.value ? '已喜欢' : '已取消');
+  } catch (error) {
+    console.error('操作失败:', error);
+    showToast('操作失败');
+  }
+};
 
 // --- 生命周期钩子 (Lifecycle Hooks) ---
 
