@@ -19,34 +19,44 @@
       <!-- 根据当前筛选显示不同内容 -->
       <div class="likes-list" v-if="activeFilter === 'liked' && likedPeople.length > 0">
         <!-- 我喜欢的列表 -->
-        <div v-for="person in likedPeople" :key="person.id" class="person-card">
-          <div class="card-image"></div>
+        <div v-for="person in likedPeople" :key="person.id" class="person-card" @click="goToDetail(person.id)">
+          <div class="card-image">
+            <img :src="getPersonImage(person)" />
+            <div class="person-id-badge" :class="{ 'male-bg': person.gender === 'male', 'female-bg': person.gender === 'female' }">
+              {{ person.id }}
+            </div>
+          </div>
           <div class="card-content">
-            <div class="name">{{ person.name }}</div>
+            <div class="name">{{ person.nickname || `用户${person.id}` }}</div>
             <div class="height-container">
               <div class="height">{{ person.height }}cm</div>
               <div class="heart-icon" @click.stop="confirmRemoveLike(person)">
                 <van-icon name="like" class="liked" />
               </div>
             </div>
-            <div class="desc">{{ person.desc }}</div>
-            <div class="like-time">{{ person.likeTime }}</div>
+            <div class="desc">{{ formatDescription(person.mem) }}</div>
+            <div class="like-time">{{ formatLikeTime(person.created_at) }}</div>
           </div>
         </div>
       </div>
 
       <div class="likes-list" v-if="activeFilter === 'likedBy' && likedByPeople.length > 0">
         <!-- 喜欢我的列表 -->
-        <div v-for="person in likedByPeople" :key="person.id" class="person-card">
-          <div class="card-image"></div>
+        <div v-for="person in likedByPeople" :key="person.id" class="person-card" @click="goToDetail(person.id)">
+          <div class="card-image">
+            <img :src="getPersonImage(person)"  />
+            <div class="person-id-badge" :class="{ 'male-bg': person.gender === 'male', 'female-bg': person.gender === 'female' }">
+              {{ person.id }}
+            </div>
+          </div>
           <div class="card-content">
-            <div class="name">{{ person.name }}</div>
+            <div class="name">{{ person.nickname || `用户${person.id}` }}</div>
             <div class="height-container">
               <div class="height">{{ person.height }}cm</div>
               <!-- 喜欢我的列表不显示红心 -->
             </div>
-            <div class="desc">{{ person.desc }}</div>
-            <div class="like-time">{{ person.likeTime }}</div>
+            <div class="desc">{{ formatDescription(person.mem) }}</div>
+            <div class="like-time">{{ formatLikeTime(person.created_at) }}</div>
           </div>
         </div>
       </div>
@@ -73,27 +83,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import TabBar from '@/components/TabBar.vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { showConfirmDialog } from 'vant'; // 修正这里
-
-// 定义 LikedPerson 接口
-interface LikedPerson {
-  id: number;
-  name: string;
-  height: number;
-  desc: string;
-  likeTime: string;
-}
-
-// 定义 Filter 接口
-interface Filter {
-  id: number;
-  label: string;
-  value: 'liked' | 'likedBy';
-  active: boolean;
-}
+import { showConfirmDialog, showToast  } from 'vant';
+import { useLikeStore } from '@/store/likeStore';
+import { useUserListStore } from '@/store/userList';
+import TabBar from '@/components/TabBar.vue';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -105,8 +100,30 @@ import likeSelectedIcon from '@/assets/icons/like-selected.svg';
 import smileIcon from '@/assets/icons/smile.svg';
 import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 
-const activeTab = ref('likes');
+// 定义 LikedPerson 接口
+interface LikedPerson {
+  id: number;
+  nickname?: string;
+  gender: string;
+  height: number;
+  mem: string;
+  created_at: string; // 点赞时间
+  avatar?: string;
+  photo?: string;
+}
+
+// 定义 Filter 接口
+interface Filter {
+  id: number;
+  label: string;
+  value: 'liked' | 'likedBy';
+  active: boolean;
+}
+
 const router = useRouter();
+const likeStore = useLikeStore();
+const userListStore = useUserListStore();
+const activeTab = ref('likes');
 
 // 添加筛选状态
 const filters = ref<Filter[]>([
@@ -116,40 +133,113 @@ const filters = ref<Filter[]>([
 
 const activeFilter = ref<'liked' | 'likedBy'>('liked');
 
+// 获取用户字典（从userListStore中获取所有用户信息）
+const userDict = computed(() => {
+  const dict: Record<number, any> = {};
+  userListStore.people.forEach(user => {
+    dict[user.id] = user;
+  });
+  return dict;
+});
+
+// 计算我喜欢的列表
+const likedPeople = computed<LikedPerson[]>(() => {
+  return likeStore.ilikeIds().map(id => {
+    const user = userDict.value[id] || {};
+    const createdAt = likeStore.ilikeDict[id];
+    
+    return {
+      id,
+      nickname: user.nickname,
+      gender: user.gender || 'unknown',
+      height: user.height || 0,
+      mem: user.mem || '',
+      created_at: createdAt || '',
+      avatar: user.avatar,
+      photo: user.photo
+    };
+  });
+});
+
+// 计算喜欢我的列表
+const likedByPeople = computed<LikedPerson[]>(() => {
+  return likeStore.likemeIds().map(id => {
+    const user = userDict.value[id] || {};
+    const createdAt = likeStore.likemeDict[id];
+    
+    return {
+      id,
+      nickname: user.nickname,
+      gender: user.gender || 'unknown',
+      height: user.height || 0,
+      mem: user.mem || '',
+      created_at: createdAt || '',
+      avatar: user.avatar,
+      photo: user.photo
+    };
+  });
+});
+
+// 格式化描述（截取8个字）
+const formatDescription = (text: string) => {
+  if (!text) return '暂无简介';
+  return text.length > 8 ? text.substring(0, 8) + '...' : text;
+};
+
+// 格式化点赞时间
+const formatLikeTime = (dateStr: string) => {
+  if (!dateStr) return '';
+  
+  const now = new Date();
+  const date = new Date(dateStr);
+  
+  // 只比较年月日部分
+  const isSameDay = 
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  
+  if (isSameDay) return '今天';
+  
+  // 设置比较日期为前一天
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const isYesterday = 
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate();
+  
+  if (isYesterday) return '昨天';
+  
+  // 计算精确天数差
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  return `${diffDays}天前`;
+};  
+
+// 获取人员图片URL
+const getPersonImage = (person: LikedPerson): string => {
+  if (person.photo) {
+    const photos = person.photo.split(',');
+    if (photos.length > 0 && photos[0].trim() !== '') {
+      return '/avatars/' + photos[0].trim();
+    }
+  }
+  return person.avatar ? '/avatars/' + person.avatar : '';
+};
+
 const toggleFilter = (filter: Filter) => {
   filters.value.forEach(f => f.active = false);
   filter.active = true;
   activeFilter.value = filter.value;
 };
 
-// 我喜欢的列表数据
-const likedPeople = ref<LikedPerson[]>([
-  { 
-    id: 2, 
-    name: '小雅', 
-    height: 168, 
-    desc: '热爱音乐和舞蹈', 
-    likeTime: '2天前'
-  },
-  { 
-    id: 5, 
-    name: '小娜', 
-    height: 166, 
-    desc: '读书爱好者', 
-    likeTime: '1周前'
-  }
-]);
-
-// 添加喜欢我的列表数据
-const likedByPeople = ref<LikedPerson[]>([
-  { id: 7, name: '小明', height: 178, desc: '喜欢运动', likeTime: '1天前' },
-  { id: 8, name: '小强', height: 175, desc: '程序员', likeTime: '3天前' }
-]);
-
 const confirmRemoveLike = (person: LikedPerson) => {
   showConfirmDialog({
     title: '确认取消喜欢',
-    message: `确定不再喜欢${person.name}吗？`,
+    message: `确定不再喜欢${person.nickname || '该用户'}吗？`,
     confirmButtonColor: '#D75670',
   })
   .then(() => {
@@ -161,17 +251,11 @@ const confirmRemoveLike = (person: LikedPerson) => {
 };
 
 const removeLike = (person: LikedPerson) => {
-  if (activeFilter.value === 'liked') {
-    const index = likedPeople.value.findIndex(p => p.id === person.id);
-    if (index > -1) {
-      likedPeople.value.splice(index, 1);
-    }
-  } else if (activeFilter.value === 'likedBy') {
-    const index = likedByPeople.value.findIndex(p => p.id === person.id);
-    if (index > -1) {
-      likedByPeople.value.splice(index, 1);
-    }
-  }
+  // 调用likeStore的removeLike方法
+  likeStore.removeLike(person.id);
+  
+  // 显示操作成功提示
+  showToast('已取消喜欢');
 };
 
 const goToDetail = (id: number) => {
@@ -181,6 +265,17 @@ const goToDetail = (id: number) => {
 const goToExplore = () => {
   router.replace('/explore');
 };
+
+// 初始化数据
+onMounted(async () => {
+  // 确保点赞数据已加载
+  await likeStore.fetchLikes();
+  
+  // 确保用户列表数据已加载
+  if (userListStore.people.length === 0) {
+    await userListStore.fetchUserList();
+  }
+});
 
 const tabs = [
   { 
@@ -265,6 +360,34 @@ const tabs = [
   width: 100%;
   height: 200px;
   background-color: #D9D9D9;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person-id-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px 0 2px 0;
+  font-size: 10px;
+  z-index: 1;
+}
+
+.male-bg {
+  background-color: #6495ED;
+}
+
+.female-bg {
+  background-color: #FF69B4;
 }
 
 .card-content {

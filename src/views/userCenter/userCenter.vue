@@ -28,15 +28,15 @@
             </div>
             <div class="stats">
               <div class="stat-item">
-                <div class="stat-number">{{ user.likesCount }}</div>
+                <div class="stat-number">{{ likes.ilikeCount }}</div>
                 <div class="stat-label">我喜欢的</div>
               </div>
               <div class="stat-item">
-                <div class="stat-number">{{ user.likedByCount }}</div>
+                <div class="stat-number">{{ likes.likemeCount }}</div>
                 <div class="stat-label">喜欢我的</div>
               </div>
               <div class="stat-item">
-                <div class="stat-number">{{ user.recentVisitorsCount }}</div>
+                <div class="stat-number">{{ "90" }}</div>
                 <div class="stat-label">最近来访</div>
               </div>
             </div>
@@ -85,6 +85,7 @@ import { useRouter } from 'vue-router';
 import { Toast, showToast  } from 'vant';
 import apiClient from '@/plugins/axios';
 import { useUserInfoStore } from '@/store/userinfo';
+import { useLikeStore } from '@/store/likeStore';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -108,11 +109,10 @@ interface MenuItem {
 interface User {
   nickname: string; // 用户昵称
   avatarUrl?: string; // 可选的头像URL
-  likesCount: number;
-  likedByCount: number;
+
   recentVisitorsCount: number;
 }
-
+const likeStore = useLikeStore();
 const activeTab = ref('profile');
 const router = useRouter();
 const avatarInput = ref<HTMLInputElement>();
@@ -120,12 +120,17 @@ const nicknameInput = ref<HTMLInputElement>();
 const isEditingNickname = ref(false);
 const tempNickname = ref('');
 const userInfoStore = useUserInfoStore();
-
+const likes = computed(() => {
+  return {
+    ilikeCount: likeStore.ilikeCount(),
+    likemeCount: likeStore.likemeCount()
+  };
+});
 // 从store中获取用户信息
 const user = computed(() => {
   return {
     nickname: userInfoStore.profile?.nickname || '用户昵称',
-    avatarUrl: userInfoStore.profile?.avatar_url || '',
+    avatarUrl: 'avatars/'+userInfoStore.profile?.avatar || '',
     // likesCount: userInfoStore.profile?.mem?.likesCount || 12,
     // likedByCount: userInfoStore.profile?.mem?.likedByCount || 5,
     // recentVisitorsCount: userInfoStore.profile?.mem?.recentVisitorsCount || 20,

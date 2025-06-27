@@ -123,16 +123,20 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter   } from 'vue-router';
 import { getPreviousRoute } from '@/utils/routeHistory';
 import { showImagePreview, showToast } from 'vant';
-import { areaList } from '@vant/area-data'; // 引入vant的地区数据
+import { areaList } from '@vant/area-data'; 
 import apiClient from '@/plugins/axios';
 import { likeUser } from '@/api/like';
-
+import { useLikeStore } from '@/store/likeStore';
+const likeStore = useLikeStore();
 const router = useRouter();
-const isLiked = ref(false);
+const isLiked = computed(() => {
+  const userId = parseInt(router.currentRoute.value.params.id as string);
+  return likeStore.hasLiked(userId);
+});
 const userInfo = ref<Record<string, any>>({});
-// --- 数据转换映射表 ---
 
-// 收入水平 -> 中文名称 映射
+
+
 const incomeMap: Record<string, string> = {
   'below_3k': '3千元以下',
   '3k_5k': '3千-5千元',
@@ -277,7 +281,21 @@ const mbtiDescription = computed(() => {
   if (!userInfo.value.mbti) return '';
   const descMap: Record<string, string> = {
     'INTP': '充满奇思妙想的革新者，对知识有着永不满足的渴望。',
-    // ... 可以补充其他类型的描述
+    'INTJ': '富有远见的战略家，擅长系统性地规划未来方向。',
+    'INFJ': '富有同理心的引导者，善于理解他人并推动积极改变。',
+    'INFP': '充满诗意的理想主义者，始终追寻内心的价值与意义。',
+    'ENTJ': '果敢的领导者，热衷于制定宏大目标并推动团队达成。',
+    'ENTP': '机智的挑战者，喜欢用创新思维解决复杂问题。',
+    'ENFJ': '热情的催化剂，擅长激励他人并建立和谐的合作关系。',
+    'ENFP': '充满活力的探索者，凭借创造力与热情感染周围的人。',
+    'ISTJ': '严谨的守护者，以责任感与专注度确保任务高质量完成。',
+    'ISTP': '务实的行动派，擅长通过实践探索解决问题的最佳路径。',
+    'ISFJ': '温暖的支持者，默默为他人提供细致入微的关怀。',
+    'ISFP': '敏感的艺术家，善于用美感与情感创造独特体验。',
+    'ESTJ': '高效的组织者，以强大的执行力维持系统的有序运行。',
+    'ESTP': '大胆的冒险者，在挑战与变化中展现卓越的适应能力。',
+    'ESFJ': '亲切的协调者，致力于维护和谐的人际关系与社会联结。',
+    'ESFP': '活力四射的表演者，享受与人互动并创造欢乐氛围。'
   };
   return descMap[userInfo.value.mbti.toUpperCase()] || '富有洞察力与好奇心的思考者。';
 });
@@ -363,7 +381,11 @@ const toggleLike = async () => {
     const action = isLiked.value ? 'unlike' : 'like';
     await likeUser(userId, action);
     
-    isLiked.value = !isLiked.value;
+    if (action === 'like') {
+      likeStore.addLike(userId);
+    } else {
+      likeStore.removeLike(userId);
+    }
     showToast(isLiked.value ? '已喜欢' : '已取消');
   } catch (error) {
     console.error('操作失败:', error);

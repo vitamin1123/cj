@@ -223,7 +223,6 @@ import PinyinMatch from 'pinyin-match';
 import { useViewStateStore } from '@/store/viewState'; 
 import { storeToRefs } from 'pinia';
 import { likeUser } from '@/api/like';
-// 移除不再需要的引入
 // import apiClient from '@/plugins/axios';
 import lunisolar from 'lunisolar';
 import { Image as VanImage } from 'vant';
@@ -231,11 +230,13 @@ import { areaList } from '@vant/area-data';
 import { useVirtualList, useScroll } from '@vueuse/core'; // 引入虚拟列表
 import { useUserListStore } from '@/store/userList';
 import { useUserInfoStore } from '@/store/userinfo';
+import { useLikeStore } from '@/store/likeStore';
 
 const viewStateStore = useViewStateStore();
 const { exploreScrollPosition } = storeToRefs(viewStateStore);
 const { setExploreScrollPosition } = viewStateStore;
 const userStore = useUserInfoStore();
+const likeStore = useLikeStore();
 const currentUser = computed(() => userStore.profile);
 const selectedAreaCode = ref(''); // 存储选择的区域代码
 const selectedAreaText = ref(''); // 存储选择的区域文本
@@ -685,7 +686,7 @@ const loadUserProfiles = async () => {
       education: profile.education,
       avatar: profile.avatar,
       photo: profile.photo,
-      liked: false,
+      liked: likeStore.hasLiked(profile.id),
       isNew: false
     }));
     
@@ -705,7 +706,11 @@ const toggleLike = async (person: Person) => {
     
     // 本地更新状态（避免重新请求）
     person.liked = !person.liked;
-    
+    if (person.liked) {
+      likeStore.addLike(person.id);
+    } else {
+      likeStore.removeLike(person.id);
+    }
     showSuccessToast(person.liked ? '已喜欢' : '已取消');
   } catch (error) {
     console.error('操作失败:', error);

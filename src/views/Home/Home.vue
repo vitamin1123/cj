@@ -124,6 +124,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useUserInfoStore } from '@/store/userinfo'
 import { useUserListStore } from '@/store/userList'
 import apiClient from '@/plugins/axios';
+import { useLikeStore } from '@/store/likeStore';
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -142,6 +143,8 @@ const isSearchFocused = ref(false);
 const isLoading = ref(true);
 const authError = ref<string | null>(null);
 const authStore = useAuthStore();
+const likeStore = useLikeStore();
+
 
 const checkAuth = async () => {
   isLoading.value = true;
@@ -163,7 +166,8 @@ const retryAuth = () => {
 onMounted(async() => {
   await checkAuth();
   await userListStore.initializeStore();
-  await userStore.fetchUserProfile()
+  await userStore.fetchUserProfile();
+  await likeStore.fetchLikes()
 });
 
 const handleSearchFocus = () => {
