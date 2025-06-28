@@ -269,6 +269,13 @@ const birthYearDisplay = computed(() => {
   return '选择年份范围';
 });
 
+// 修改筛选标签 - 支持多选独立模式
+const filters = ref<Filter[]>([
+  { id: 1, label: '同城', active: false, type: 'location' },
+  { id: 2, label: '只看男', active:false, type: 'gender', value: 'male' },
+  { id: 3, label: '只看女', active: false, type: 'gender', value: 'female' },
+]);
+
 const yearFormatter = (type: string, option: any) => {
   if (type === 'year') {
     option.text = option.text + '年';
@@ -558,22 +565,30 @@ const highlightMem = (text: string, id: number): string => {
 
 
 
-
-
-
-
-// 修改筛选标签 - 支持多选独立模式
-const filters = ref<Filter[]>([
-  { id: 1, label: '同城', active: false, type: 'location' },
-  { id: 2, label: '只看男', active: false, type: 'gender', value: 'male' },
-  { id: 3, label: '只看女', active: false, type: 'gender', value: 'female' },
-  // { id: 4, label: '新人', active: false, type: 'newbie' }
-]);
-
 // 性别筛选状态：0-取消选中，1-只看男，2-只看女
 const genderFilterState = ref<0 | 1 | 2>(0);
-
+// 修改后的toggleFilter函数
 const toggleFilter = (filter: Filter) => {
+  if (filter.type === 'gender') {
+    // 如果是性别筛选，先取消所有性别筛选
+    const wasActive = filter.active;
+    filters.value.forEach(f => {
+      if (f.type === 'gender') f.active = false;
+    });
+    
+    // 如果点击的不是当前激活的筛选，则激活它
+    if (!wasActive) {
+      filter.active = true;
+    }
+  } else {
+    // 其他类型的筛选直接切换状态
+    filter.active = !filter.active;
+  }
+  
+  // 重新应用筛选
+  handleSearch();
+};
+const toggleFilter_bak = (filter: Filter) => {
   if (filter.type === 'gender') {
     // 性别筛选的三状态循环逻辑
     if (filter.value === 'male') {
@@ -691,10 +706,11 @@ const loadUserProfiles = async () => {
     }));
     
     filteredPeopleList.value = [...allPeopleList.value];
-    
+    return true
   } catch (error) {
     console.error('加载用户数据失败:', error);
     showFailToast('加载数据失败');
+    return false
   }
 };
 
@@ -769,9 +785,19 @@ onDeactivated(() => {
   console.log(`ExploreView deactivated. Saved scroll position to Pinia: ${liveScrollPosition.value}`);
 });
 
-onMounted(() => {
-  loadUserProfiles();
-  console.log('currentUser:', currentUser.value?.region_code.substring(0, 4));
+onMounted(async() => {
+   const loaded = await loadUserProfiles();
+   if (loaded) {
+    if (currentUser.value?.gender === 'male') {
+      const femaleFilter = filters.value.find(f => f.value === 'female');
+      if (femaleFilter) femaleFilter.active = true;
+    } else if (currentUser.value?.gender === 'female') {
+      const maleFilter = filters.value.find(f => f.value === 'male');
+      if (maleFilter) maleFilter.active = true;
+    }
+    handleSearch();
+  }
+  console.log('currentUser:', currentUser.value?.region_code.substring(0, 4),);
   console.log('onMounted triggered. peopleGridRef.value:', peopleGridRef.value);
 });
 </script>

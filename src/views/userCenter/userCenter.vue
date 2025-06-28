@@ -75,17 +75,47 @@
       @change="handleAvatarChange" 
       style="display: none;"
     />
+
+    <!-- 照片上传弹出层 -->
+    <van-popup v-model:show="showPhotoPopup" round position="bottom" :style="{ height: '60%' }">
+      <div class="photo-upload-container">
+        <div class="popup-header">
+          <h2>我的照片</h2>
+          <van-button round type="primary" @click="showPhotoPopup = false">完成</van-button>
+        </div>
+        
+        <div class="photos-container">
+          <!-- 使用van-uploader的原始样式 -->
+          <van-uploader
+            v-model="fileList"
+            :after-read="afterRead"
+            :before-read="beforeRead"
+            :max-count="6"
+            :max-size="5 * 1024 * 1024"
+            multiple
+            @oversize="onOversize"
+          >
+            <!-- 使用van-uploader默认的预览和删除按钮 -->
+          </van-uploader>
+        </div>
+        
+        <div class="upload-tips">
+          <p>最多可上传6张照片</p>
+          <p>支持JPG、PNG格式，单张不超过5MB</p>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, computed  } from 'vue';
-import TabBar from '@/components/TabBar.vue';
+import { ref, nextTick, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Toast, showToast  } from 'vant';
+import { Toast, showToast } from 'vant';
 import apiClient from '@/plugins/axios';
 import { useUserInfoStore } from '@/store/userinfo';
 import { useLikeStore } from '@/store/likeStore';
+import TabBar from '@/components/TabBar.vue';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -109,9 +139,10 @@ interface MenuItem {
 interface User {
   nickname: string; // 用户昵称
   avatarUrl?: string; // 可选的头像URL
-
   recentVisitorsCount: number;
 }
+
+const userInfoStore = useUserInfoStore();
 const likeStore = useLikeStore();
 const activeTab = ref('profile');
 const router = useRouter();
@@ -119,21 +150,38 @@ const avatarInput = ref<HTMLInputElement>();
 const nicknameInput = ref<HTMLInputElement>();
 const isEditingNickname = ref(false);
 const tempNickname = ref('');
-const userInfoStore = useUserInfoStore();
-const likes = computed(() => {
-  return {
-    ilikeCount: likeStore.ilikeCount(),
-    likemeCount: likeStore.likemeCount()
-  };
-});
+const showPhotoPopup = ref(false);
+const fileList = ref<any[]>([]);
+const userPhotos = ref<string[]>([]);
+
 // 从store中获取用户信息
 const user = computed(() => {
   return {
     nickname: userInfoStore.profile?.nickname || '用户昵称',
-    avatarUrl: 'avatars/'+userInfoStore.profile?.avatar || '',
-    // likesCount: userInfoStore.profile?.mem?.likesCount || 12,
-    // likedByCount: userInfoStore.profile?.mem?.likedByCount || 5,
-    // recentVisitorsCount: userInfoStore.profile?.mem?.recentVisitorsCount || 20,
+    avatarUrl: 'avatars/' + userInfoStore.profile?.avatar || '',
+  };
+});
+
+// 监听用户照片变化
+watch(() => userInfoStore.profile?.photo, (newPhoto) => {
+  if (newPhoto) {
+    userPhotos.value = newPhoto.split(',').filter(p => p.trim());
+    // 更新van-uploader的文件列表
+    fileList.value = userPhotos.value.map(photo => ({
+      url: 'photos/' + photo,
+      status: 'done',
+      message: '上传成功'
+    }));
+  } else {
+    userPhotos.value = [];
+    fileList.value = [];
+  }
+}, { immediate: true });
+
+const likes = computed(() => {
+  return {
+    ilikeCount: likeStore.ilikeCount(),
+    likemeCount: likeStore.likemeCount()
   };
 });
 
@@ -145,40 +193,8 @@ onMounted(() => {
 const editAvatar = () => {
   avatarInput.value?.click();
 };
-// 请求示例 
-// const response = await apiClient.post('/api/profile', profileData);
 
 // 处理头像选择
-
-// 编辑昵称
-const editNickname = () => {
-  isEditingNickname.value = true;
-  tempNickname.value = user.value.nickname;
-  nextTick(() => {
-    nicknameInput.value?.focus();
-  });
-};
-
-// const fetchUserProfile = async () => {
-//   try {
-//     const response = await apiClient.get('/api/getprofile');
-//     const profileData = response.data;
-    
-//     user.value = {
-//       ...user.value,
-//       nickname: profileData.nickname || '用户昵称',
-//       avatarUrl: profileData.avatar_url || '',
-//       likesCount: profileData.likesCount || 0,
-//       likedByCount: profileData.likedByCount || 0,
-//       recentVisitorsCount: profileData.recentVisitorsCount || 0,
-//     };
-//   } catch (error) {
-//     console.error('获取用户资料失败', error);
-//     showToast('获取用户资料失败');
-//   }
-// };
-
-// 上传头像
 const handleAvatarChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
@@ -224,6 +240,15 @@ const handleAvatarChange = async (event: Event) => {
   }
 };
 
+// 编辑昵称
+const editNickname = () => {
+  isEditingNickname.value = true;
+  tempNickname.value = user.value.nickname;
+  nextTick(() => {
+    nicknameInput.value?.focus();
+  });
+};
+
 // 保存昵称
 const saveNickname = async () => {
   if (tempNickname.value.trim()) {
@@ -253,10 +278,70 @@ const cancelEdit = () => {
   tempNickname.value = '';
 };
 
+// 照片上传前的校验
+const beforeRead = (file: any) => {
+  if (!file.type.startsWith('image/')) {
+    showToast('请上传图片文件');
+    return false;
+  }
+  return true;
+};
+
+// 文件大小超过限制
+const onOversize = () => {
+  showToast('图片大小不能超过5MB');
+};
+
+// 照片上传处理
+const afterRead = async (file: any) => {
+  file.status = 'uploading';
+  file.message = '上传中...';
+  
+  try {
+    const formData = new FormData();
+    formData.append('file', file.file);
+    
+    const response = await apiClient.post('/api/upload-photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    // 更新照片列表
+    userPhotos.value.push(response.data.filename);
+    
+    // 保存到用户资料
+    await savePhotos();
+    
+    file.status = 'done';
+    file.message = '上传成功';
+  } catch (error) {
+    console.error('照片上传失败', error);
+    file.status = 'failed';
+    file.message = '上传失败';
+    showToast('照片上传失败');
+  }
+};
+
+// 保存照片到用户资料
+const savePhotos = async () => {
+  try {
+    await apiClient.post('/api/save-photos', {
+      photos: userPhotos.value.join(',')
+    });
+    
+    // 更新用户信息
+    await userInfoStore.fetchUserProfile();
+  } catch (error) {
+    console.error('保存照片失败', error);
+    showToast('保存照片失败');
+  }
+};
+
 const menuItems = ref<MenuItem[]>([
   { id: 'profile-maintenance', label: '资料维护', route: '/profile-setup' },
-  { id: 'settings', label: '设置', action: () => console.log('Navigate to settings') }, // 示例action
-  { id: 'logout', label: '退出登录', action: () => console.log('Logout') }, // 示例action
+  { id: 'photos', label: '我的照片', action: () => showPhotoPopup.value = true },
+  { id: 'mana', label: '管理', action: () => console.log('mana') },
 ]);
 
 const tabs = [
@@ -300,7 +385,6 @@ const tabs = [
   font-family: "Microsoft YaHei", sans-serif;
   display: flex;
   flex-direction: column;
-
   padding-bottom: 100px; /* 为底部TabBar留出空间，包含iOS安全区域 */
 }
 
@@ -471,5 +555,96 @@ const tabs = [
 
 .menu-item:last-child {
   border-bottom: none;
+}
+
+/* 照片上传弹出层样式 */
+.photo-upload-container {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
+}
+
+.popup-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.photos-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px;
+}
+
+/* 调整van-uploader默认样式 - 三等分宽度 */
+:deep(.van-uploader) {
+  width: 100%;
+}
+
+:deep(.van-uploader__wrapper) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 三等分 */
+  gap: 8px; /* 间距8px */
+}
+
+:deep(.van-uploader__upload),
+:deep(.van-uploader__preview) {
+  width: 100% !important;
+  height: 0 !important;
+  padding-bottom: 100% !important; /* 保持正方形 */
+  position: relative !important;
+  margin: 0 !important;
+}
+
+:deep(.van-uploader__preview-image),
+:deep(.van-uploader__upload-icon),
+:deep(.van-uploader__upload-text) {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+:deep(.van-uploader__preview-image) {
+  border-radius: 8px;
+}
+
+:deep(.van-uploader__upload) {
+  background-color: #f9f9f9;
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+}
+
+:deep(.van-uploader__preview-delete) {
+  background-color: rgba(0, 0, 0, 0.5);
+  top: 4px !important;
+  right: 4px !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+:deep(.van-uploader__file) {
+  border-radius: 8px;
+}
+
+.upload-tips {
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+  padding: 16px 0;
+  border-top: 1px solid #f0f0f0;
+  margin-top: auto;
 }
 </style>

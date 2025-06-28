@@ -18,9 +18,13 @@ from sqlmodel import SQLModel, Field, create_engine, Session, select
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, field_validator
 from typing import Optional
+import io
+from PIL import Image
 
 UPLOAD_DIR = "./public/"
+PHOTO_DIR = os.path.join(UPLOAD_DIR, "photos")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(PHOTO_DIR, exist_ok=True)
 
 beijing_tz = timezone(timedelta(hours=8))
 app = FastAPI()
@@ -229,6 +233,144 @@ async def get_current_time():
         "current_time": current_time.isoformat(),
         "timezone": "UTC+8"
     }
+
+@app.post("/upload-photo")
+async def upload_photo(
+    file: UploadFile = File(...),
+    openid: str = Depends(get_current_user)
+):
+    # 验证文件类型
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="只能上传图片文件")
+
+    # 验证文件大小
+    if file.size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="图片大小不能超过5MB")
+
+    # 读取文件内容
+    contents = await file.read()
+
+    try:
+        # 使用Pillow压缩图片
+        img = Image.open(io.BytesIO(contents))
+        
+        # 转换格式为JPEG并压缩
+        if img.format != 'JPEG':
+            img = img.convert('RGB')
+        
+        # 设置最大尺寸
+        max_size = 1200
+        if max(img.width, img.height) > max_size:
+            img.thumbnail((max_size, max_size), Image.LANCZOS)
+        
+        # 压缩质量 (85%)
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=85, optimize=True)
+        compressed_contents = output.getvalue()
+        
+        # 生成唯一文件名
+        file_ext = ".jpg"
+        unique_filename = f"{uuid.uuid4().hex}{file_ext}"
+        file_path = os.path.join(PHOTO_DIR, unique_filename)
+        
+        # 保存压缩后的图片
+        with open(file_path, "wb") as f:
+            f.write(compressed_contents)
+            
+    except Exception as e:
+        print(f"图片处理失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="图片处理失败")
+        
+    # 只返回文件名，不包含路径
+    return {"filename": unique_filename}
+
+# 添加照片删除接口 - 修复：更新数据库
+@app.post("/delete-photo")
+async def delete_photo(
+    data: dict,
+    openid: str = Depends(get_current_user)
+):
+    filename = data.get("filename")
+    if not filename:
+        raise HTTPException(status_code=400, detail="缺少文件名")
+    
+    file_path = os.path.join(PHOTO_DIR, filename)
+    
+    try:
+        # 从数据库移除该照片
+        with Session(engine) as session:
+            user = session.exec(select(User).where(User.openid == openid)).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="用户不存在")
+            
+            # 从照片列表中移除该文件名
+            if user.photo:
+                photos = [p.strip() for p in user.photo.split(',') if p.strip()]
+                if filename in photos:
+                    photos.remove(filename)
+                    user.photo = ','.join(photos)
+                    session.add(user)
+                    session.commit()
+            
+        # 删除物理文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return {"status": "success", "message": "照片已删除"}
+        else:
+            return {"status": "success", "message": "照片不存在或已删除"}
+    except Exception as e:
+        print(f"删除照片失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="删除照片失败")
+
+# 添加保存照片列表接口 - 修复：只存储文件名
+@app.post("/save-photos")
+async def save_photos(
+    data: dict,
+    openid: str = Depends(get_current_user)
+):
+    photos = data.get("photos", "")
+    
+    # 确保只存储文件名（移除可能的路径）
+    if photos:
+        # 分割并提取纯文件名
+        photo_list = [p.strip() for p in photos.split(',') if p.strip()]
+        # 移除路径部分，只保留文件名
+        cleaned_photos = [os.path.basename(p) for p in photo_list]
+        photos = ','.join(cleaned_photos)
+    
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.openid == openid)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        # 获取旧照片列表（只存储文件名）
+        old_photos = []
+        if user.photo:
+            old_photos = [p.strip() for p in user.photo.split(',') if p.strip()]
+        
+        # 更新照片列表
+        user.photo = photos
+        session.add(user)
+        session.commit()
+        
+        # 删除不再使用的旧照片
+        new_photos = []
+        if photos:
+            new_photos = [p.strip() for p in photos.split(',') if p.strip()]
+        
+        photos_to_delete = set(old_photos) - set(new_photos)
+        
+        for photo in photos_to_delete:
+            if photo and re.match(r'^[a-f0-9]{32}\.jpg$', photo):  # 验证文件名格式
+                file_path = os.path.join(PHOTO_DIR, photo)
+                try:
+                    if os.path.exists(file_path) and os.path.isfile(file_path):
+                        os.remove(file_path)
+                        print(f"已删除旧照片: {photo}")
+                except Exception as e:
+                    print(f"警告: 无法删除旧照片 {photo}: {str(e)}")
+    
+    return {"status": "success", "message": "照片列表已更新"}
 
 # 在User模型后添加UserLike模型
 class UserLike(SQLModel, table=True):
