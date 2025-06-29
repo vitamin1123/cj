@@ -18,20 +18,19 @@ from sqlmodel import SQLModel, Field, create_engine, Session, select
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, field_validator
 from typing import Optional
-import io
-from PIL import Image
 
-UPLOAD_DIR = "./public/"
-PHOTO_DIR = os.path.join(UPLOAD_DIR, "photos")
+UPLOAD_DIR = "./public/avatar/"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(PHOTO_DIR, exist_ok=True)
+
+UPLOAD_PHOTO_DIR = "./img/photo/"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 beijing_tz = timezone(timedelta(hours=8))
 app = FastAPI()
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "123123224-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_SECRET = "81231231231214f4b"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -47,7 +46,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "12323213",  # 请替换为您的正式AppSecret
+    "secret": "123123",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -234,143 +233,148 @@ async def get_current_time():
         "timezone": "UTC+8"
     }
 
+# 新增照片上传接口
 @app.post("/upload-photo")
 async def upload_photo(
     file: UploadFile = File(...),
     openid: str = Depends(get_current_user)
 ):
     # 验证文件类型
-    if not file.content_type.startswith('image/'):
+    if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="只能上传图片文件")
 
-    # 验证文件大小
-    if file.size > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="图片大小不能超过5MB")
+    # 生成唯一文件名
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    unique_filename = f"{uuid.uuid4().hex}.jpg"
+    file_path = os.path.join(UPLOAD_PHOTO_DIR, unique_filename)
 
-    # 读取文件内容
-    contents = await file.read()
-
+    # 保存文件并检查大小
+    file_size = 0
+    CHUNK_SIZE = 64 * 1024  # 64KB
     try:
-        # 使用Pillow压缩图片
-        img = Image.open(io.BytesIO(contents))
-        
-        # 转换格式为JPEG并压缩
-        if img.format != 'JPEG':
-            img = img.convert('RGB')
-        
-        # 设置最大尺寸
-        max_size = 1200
-        if max(img.width, img.height) > max_size:
-            img.thumbnail((max_size, max_size), Image.LANCZOS)
-        
-        # 压缩质量 (85%)
-        output = io.BytesIO()
-        img.save(output, format='JPEG', quality=85, optimize=True)
-        compressed_contents = output.getvalue()
-        
-        # 生成唯一文件名
-        file_ext = ".jpg"
-        unique_filename = f"{uuid.uuid4().hex}{file_ext}"
-        file_path = os.path.join(PHOTO_DIR, unique_filename)
-        
-        # 保存压缩后的图片
         with open(file_path, "wb") as f:
-            f.write(compressed_contents)
-            
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                file_size += len(chunk)
+                if file_size > 5 * 1024 * 1024:  # 5MB
+                    os.remove(file_path)
+                    raise HTTPException(status_code=400, detail="图片大小不能超过5MB")
+                f.write(chunk)
     except Exception as e:
-        print(f"图片处理失败: {str(e)}")
-        raise HTTPException(status_code=500, detail="图片处理失败")
-        
-    # 只返回文件名，不包含路径
-    return {"filename": unique_filename}
-
-# 添加照片删除接口 - 修复：更新数据库
-@app.post("/delete-photo")
-async def delete_photo(
-    data: dict,
-    openid: str = Depends(get_current_user)
-):
-    filename = data.get("filename")
-    if not filename:
-        raise HTTPException(status_code=400, detail="缺少文件名")
-    
-    file_path = os.path.join(PHOTO_DIR, filename)
-    
-    try:
-        # 从数据库移除该照片
-        with Session(engine) as session:
-            user = session.exec(select(User).where(User.openid == openid)).first()
-            if not user:
-                raise HTTPException(status_code=404, detail="用户不存在")
-            
-            # 从照片列表中移除该文件名
-            if user.photo:
-                photos = [p.strip() for p in user.photo.split(',') if p.strip()]
-                if filename in photos:
-                    photos.remove(filename)
-                    user.photo = ','.join(photos)
-                    session.add(user)
-                    session.commit()
-            
-        # 删除物理文件
         if os.path.exists(file_path):
             os.remove(file_path)
-            return {"status": "success", "message": "照片已删除"}
-        else:
-            return {"status": "success", "message": "照片不存在或已删除"}
-    except Exception as e:
-        print(f"删除照片失败: {str(e)}")
-        raise HTTPException(status_code=500, detail="删除照片失败")
+        raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
 
-# 添加保存照片列表接口 - 修复：只存储文件名
-@app.post("/save-photos")
-async def save_photos(
-    data: dict,
+    # 异步压缩图片
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, compress_image, file_path)
+    except Exception as e:
+        print(f"图片压缩失败: {str(e)}")
+
+    return {"filename": unique_filename}
+
+# 新增照片删除接口
+@app.post("/delete-photo")
+async def delete_photo(
+    photo_name: str,
     openid: str = Depends(get_current_user)
 ):
-    photos = data.get("photos", "")
+    # 检查文件名是否有效
+    if not photo_name or '/' in photo_name or '\\' in photo_name:
+        raise HTTPException(status_code=400, detail="无效的文件名")
+
+    file_path = os.path.join(UPLOAD_PHOTO_DIR, photo_name)
     
-    # 确保只存储文件名（移除可能的路径）
-    if photos:
-        # 分割并提取纯文件名
-        photo_list = [p.strip() for p in photos.split(',') if p.strip()]
-        # 移除路径部分，只保留文件名
-        cleaned_photos = [os.path.basename(p) for p in photo_list]
-        photos = ','.join(cleaned_photos)
+    # 检查文件是否存在
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="照片不存在")
+    
+    # 从用户照片列表中移除
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.openid == openid)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        # 更新照片列表
+        photos = user.photo.split(',') if user.photo else []
+        if photo_name in photos:
+            photos.remove(photo_name)
+            user.photo = ','.join(photos)
+            session.add(user)
+            session.commit()
+    
+    # 删除物理文件
+    try:
+        os.remove(file_path)
+        return {"status": "success", "message": "照片删除成功"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"文件删除失败: {str(e)}")
+
+# 新增保存照片列表接口
+@app.post("/save-photos")
+async def save_photos(
+    photos_data: dict,
+    openid: str = Depends(get_current_user)
+):
+    photos_list = photos_data.get("photos", [])
+    photos_str = ','.join(photos_list)
     
     with Session(engine) as session:
         user = session.exec(select(User).where(User.openid == openid)).first()
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
-        # 获取旧照片列表（只存储文件名）
-        old_photos = []
-        if user.photo:
-            old_photos = [p.strip() for p in user.photo.split(',') if p.strip()]
+        # 清理不再使用的照片
+        old_photos = user.photo.split(',') if user.photo else []
+        for old_photo in old_photos:
+            if old_photo and old_photo not in photos_list:
+                old_path = os.path.join(UPLOAD_PHOTO_DIR, old_photo)
+                try:
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                except Exception as e:
+                    print(f"警告: 无法删除旧照片 {old_photo}: {str(e)}")
         
         # 更新照片列表
-        user.photo = photos
+        user.photo = photos_str
         session.add(user)
         session.commit()
-        
-        # 删除不再使用的旧照片
-        new_photos = []
-        if photos:
-            new_photos = [p.strip() for p in photos.split(',') if p.strip()]
-        
-        photos_to_delete = set(old_photos) - set(new_photos)
-        
-        for photo in photos_to_delete:
-            if photo and re.match(r'^[a-f0-9]{32}\.jpg$', photo):  # 验证文件名格式
-                file_path = os.path.join(PHOTO_DIR, photo)
-                try:
-                    if os.path.exists(file_path) and os.path.isfile(file_path):
-                        os.remove(file_path)
-                        print(f"已删除旧照片: {photo}")
-                except Exception as e:
-                    print(f"警告: 无法删除旧照片 {photo}: {str(e)}")
     
-    return {"status": "success", "message": "照片列表已更新"}
+    return {"status": "success", "message": "照片列表保存成功"}
+
+# 图片压缩函数
+def compress_image(file_path):
+    try:
+        from PIL import Image
+        img = Image.open(file_path)
+        
+        # 设置最大尺寸
+        max_size = 800
+        if max(img.size) > max_size:
+            ratio = max_size / max(img.size)
+            new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+            img = img.resize(new_size, Image.LANCZOS)
+        
+        # 设置质量参数
+        quality = 80
+        
+        # 如果是PNG且尺寸较大，转换为JPG
+        if file_path.lower().endswith('.png') and max(img.size) > 500:
+            output_path = os.path.splitext(file_path)[0] + '.jpg'
+            img = img.convert('RGB')
+            img.save(output_path, 'JPEG', quality=quality)
+            os.remove(file_path)  # 删除原PNG文件
+            return output_path
+        
+        # 保存压缩后的图片
+        img.save(file_path, quality=quality)
+        return file_path
+    except Exception as e:
+        print(f"图片压缩失败: {str(e)}")
+        return file_path
 
 # 在User模型后添加UserLike模型
 class UserLike(SQLModel, table=True):
@@ -427,6 +431,54 @@ async def handle_like(
             )
             session.commit()
             return {"status": "success", "message": "取消点赞成功"}
+
+
+@app.get("/get-likes")
+async def get_likes(
+    openid: str = Depends(get_current_user)
+):
+    with Session(engine) as session:
+        # 1. 根据openid获取当前用户ID
+        stmt = select(User.id).where(User.openid == openid)
+        current_user = session.exec(stmt).first()
+
+        if not current_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        current_user_id = current_user
+
+        # 2. 分别查询 ilike 和 likeme
+        # 查询 ilike (我喜欢的)
+        ilike_stmt = select(
+            UserLike.liked_id.label("user_id"),
+            UserLike.created_at
+        ).where(UserLike.liker_id == current_user_id)
+
+        ilike_results = session.exec(ilike_stmt).all()
+
+        # 查询 likeme (喜欢我的)
+        likeme_stmt = select(
+            UserLike.liker_id.label("user_id"),
+            UserLike.created_at
+        ).where(UserLike.liked_id == current_user_id)
+
+        likeme_results = session.exec(likeme_stmt).all()
+
+        # 3. 处理结果
+        ilike = [{
+            "user_id": row.user_id,
+            "created_at": row.created_at.isoformat()
+        } for row in ilike_results]
+
+        likeme = [{
+            "user_id": row.user_id,
+            "created_at": row.created_at.isoformat()
+        } for row in likeme_results]
+
+        return {
+            "ilike": ilike,
+            "likeme": likeme
+        }
 
 # 新增保存资料接口
 @app.post("/profile")
@@ -594,53 +646,6 @@ async def get_user_by_id(
 
         # 直接返回原始数据，不进行任何处理
         return user.model_dump(exclude={"openid", "mem_pri", "phone"})
-
-@app.get("/get-likes")
-async def get_likes(
-    openid: str = Depends(get_current_user)
-):
-    with Session(engine) as session:
-        # 1. 根据openid获取当前用户ID
-        stmt = select(User.id).where(User.openid == openid)
-        current_user = session.exec(stmt).first()
-        
-        if not current_user:
-            raise HTTPException(status_code=404, detail="用户不存在")
-        
-        current_user_id = current_user
-        
-        # 2. 分别查询 ilike 和 likeme
-        # 查询 ilike (我喜欢的)
-        ilike_stmt = select(
-            UserLike.liked_id.label("user_id"),
-            UserLike.created_at
-        ).where(UserLike.liker_id == current_user_id)
-        
-        ilike_results = session.exec(ilike_stmt).all()
-        
-        # 查询 likeme (喜欢我的)
-        likeme_stmt = select(
-            UserLike.liker_id.label("user_id"),
-            UserLike.created_at
-        ).where(UserLike.liked_id == current_user_id)
-        
-        likeme_results = session.exec(likeme_stmt).all()
-        
-        # 3. 处理结果
-        ilike = [{
-            "user_id": row.user_id,
-            "created_at": row.created_at.isoformat()
-        } for row in ilike_results]
-        
-        likeme = [{
-            "user_id": row.user_id,
-            "created_at": row.created_at.isoformat()
-        } for row in likeme_results]
-        
-        return {
-            "ilike": ilike,
-            "likeme": likeme
-        }
 
 @app.get("/explore_people")
 async def explore_people():

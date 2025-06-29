@@ -11,8 +11,17 @@
     <div class="content">
       <div class="profile-card scroll-animate">
         <div class="avatar-section">
-          <img v-if="userInfo.avatar" :src="`/avatars/${userInfo.avatar}`" class="avatar" />
-          <div v-else class="avatar"></div>
+          <img 
+            v-if="userInfo.avatar" 
+            :src="`/avatars/${userInfo.avatar}`" 
+            class="avatar" 
+          />
+          <img 
+            v-else 
+            :src="getDefaultAvatarUrl()" 
+            class="avatar" 
+          />
+          
           <div class="basic-info">
             <h2 class="name">{{ userInfo.nickname || '未设置昵称' }}</h2>
             <!-- 修改：确保年龄、身高、星座在同一行 -->
@@ -135,7 +144,13 @@ const isLiked = computed(() => {
 });
 const userInfo = ref<Record<string, any>>({});
 
-
+// 计算默认头像URL，包含性别默认值处理
+const getDefaultAvatarUrl = () => {
+  const gender = userInfo.value.gender || 'male'; // 设置默认性别为male
+  return gender === 'male' 
+    ? '/avatars/male_def.png' 
+    : '/avatars/female_def.png';
+};
 
 const incomeMap: Record<string, string> = {
   'below_3k': '3千元以下',
@@ -201,7 +216,7 @@ const parseRegion = (code: string) => {
 const photoList = computed(() => {
   if (!userInfo.value.photo) return [];
   // 假设照片路径需要拼接服务器地址
-  const baseUrl = '/avatars/'; 
+  const baseUrl = '/photo/'; 
   return userInfo.value.photo.split(',')
     .filter((p: string) => p.trim())
     .map((p: string) => `${baseUrl}${p.trim()}`);
@@ -338,12 +353,6 @@ const fetchUserData = async () => {
   try {
     const userId = router.currentRoute.value.params.id;
     const response = await apiClient.get(`/api/user/${userId}`);
-    
-    // **注意**: 此处为了演示，直接使用您提供的静态数据。
-    // 在实际项目中，您应该注释掉下面的代码，并取消上面API调用的注释。
-    // const mockResponse = {
-    //   data: {"occupation":"教师","avatar":"9.jpg","id":9426,"income_level":"below_3k","photo":"45649.jpg,37706.jpg,41582.jpg,39962.jpg,20231.jpg,16101.jpg,54648.jpg,35604.jpg","education":"bachelor","created_at":"2025-05-20T17:16:58","nickname":"果断蚯蚓82","religion":"none","updated_at":"2025-06-20T00:20:19","birth_date":"2009-06-01T00:00:00","mbti":"INTP","height":185,"gender":"male","weight":72.0,"mem":"来自农村，通过自己努力在城市立足。温和善良，注重家庭，希望未来能组建一个温馨的家庭。希望对方性格温柔，善解人意，有稳定工作。","region_code":"310104"}
-    // };
     
     if (response.data) {
       userInfo.value = response.data;

@@ -431,7 +431,7 @@ const getPersonImage = (person: Person): string => {
   if (person.photo) {
     const photos = person.photo.split(',');
     if (photos.length > 0 && photos[0].trim() !== '') {
-      return 'avatars/'+photos[0].trim();
+      return 'photo/'+photos[0].trim();
     }
   }
   return 'avatars/'+person.avatar || '';
@@ -521,7 +521,9 @@ const handleSearch = () => {
     // 6. 关键词搜索（只匹配mem字段）
     if (keyword) {
       const match = PinyinMatch.match(person.mem || '', keyword);
-      if (match === false) {
+      const occ_match = PinyinMatch.match(person.occupation as string,keyword );
+      const id_match = person.id.toString() === keyword
+      if (match === false && occ_match === false && id_match === false) {
         return false;
       }
       

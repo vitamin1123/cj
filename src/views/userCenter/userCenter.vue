@@ -6,7 +6,7 @@
       <div class="profile-card">
         <div class="profile-content">
           <div class="avatar-wrapper" @click="editAvatar">
-            <div class="avatar" :style="{ backgroundImage: user.avatarUrl ? `url(${user.avatarUrl})` : 'none' }">
+            <div class="avatar" :style="{ backgroundImage: `url(${user.avatarUrl})` }">
               <div v-if="!user.avatarUrl" class="avatar-placeholder">+</div>
             </div>
             <!-- <div class="edit-hint">点击编辑</div> -->
@@ -85,7 +85,7 @@
         </div>
         
         <div class="photos-container">
-          <!-- 使用van-uploader的原始样式 -->
+          <!-- 使用van-uploader的原始样式  @oversize="onOversize"-->
           <van-uploader
             v-model="fileList"
             :after-read="afterRead"
@@ -93,7 +93,8 @@
             :max-count="6"
             :max-size="5 * 1024 * 1024"
             multiple
-            @oversize="onOversize"
+            
+            @delete="deletePhoto"
           >
             <!-- 使用van-uploader默认的预览和删除按钮 -->
           </van-uploader>
@@ -116,6 +117,7 @@ import apiClient from '@/plugins/axios';
 import { useUserInfoStore } from '@/store/userinfo';
 import { useLikeStore } from '@/store/likeStore';
 import TabBar from '@/components/TabBar.vue';
+import Compressor from 'compressorjs';
 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
@@ -156,9 +158,22 @@ const userPhotos = ref<string[]>([]);
 
 // 从store中获取用户信息
 const user = computed(() => {
+  // 获取用户头像和性别
+  const avatar = userInfoStore.profile?.avatar;
+  const gender = userInfoStore.profile?.gender;
+  
+  // 设置默认头像路径
+  let defaultAvatar = '';
+  if (!avatar || avatar === '') {
+    // 根据性别设置不同的默认头像
+    defaultAvatar = gender === 'female'
+      ? 'avatars/female_def.png' 
+      : 'avatars/male_def.png';
+  }
+  
   return {
     nickname: userInfoStore.profile?.nickname || '用户昵称',
-    avatarUrl: 'avatars/' + userInfoStore.profile?.avatar || '',
+    avatarUrl: avatar ? 'avatars/' + avatar : defaultAvatar,
   };
 });
 
@@ -168,7 +183,7 @@ watch(() => userInfoStore.profile?.photo, (newPhoto) => {
     userPhotos.value = newPhoto.split(',').filter(p => p.trim());
     // 更新van-uploader的文件列表
     fileList.value = userPhotos.value.map(photo => ({
-      url: 'photos/' + photo,
+      url: 'photo/' + photo,
       status: 'done',
       message: '上传成功'
     }));
@@ -199,11 +214,6 @@ const handleAvatarChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (file) {
-    // 检查文件大小（限制5MB）
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('图片大小不能超过5MB');
-      return;
-    }
     
     // 检查文件类型
     if (!file.type.startsWith('image/')) {
@@ -211,14 +221,24 @@ const handleAvatarChange = async (event: Event) => {
       return;
     }
     
-    // 创建预览URL
-    const previewUrl = URL.createObjectURL(file);
-    user.value.avatarUrl = previewUrl;
-    
     try {
+      // 压缩图片
+      const options = {
+        maxSizeMB: 0.5,          // 目标大小0.5MB
+        maxWidthOrHeight: 800,   // 限制宽高
+        useWebWorker: true,      // 使用WebWorker加速
+        fileType: file.type,     // 保持原始文件类型
+      };
+      
+      const compressedFile = await imageCompression(file, options);
+      
+      // 创建预览URL
+      const previewUrl = URL.createObjectURL(compressedFile);
+      user.value.avatarUrl = previewUrl;
+      
       // 创建FormData并上传文件
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressedFile, file.name);
       
       const response = await apiClient.post('/api/upload-avatar', formData, {
         headers: {
@@ -226,8 +246,6 @@ const handleAvatarChange = async (event: Event) => {
         },
       });
       
-      // 更新头像URL为服务器返回的URL
-      // user.value.avatarUrl = response.data.avatar_url;
       showToast('头像更新成功');
       await userInfoStore.fetchUserProfile();
     } catch (error) {
@@ -239,6 +257,50 @@ const handleAvatarChange = async (event: Event) => {
     }
   }
 };
+// const handleAvatarChange = async (event: Event) => {
+//   const target = event.target as HTMLInputElement;
+//   const file = target.files?.[0];
+//   if (file) {
+//     // 检查文件大小（限制5MB）
+//     if (file.size > 5 * 1024 * 1024) {
+//       showToast('图片大小不能超过5MB');
+//       return;
+//     }
+    
+//     // 检查文件类型
+//     if (!file.type.startsWith('image/')) {
+//       showToast('请选择图片文件');
+//       return;
+//     }
+    
+//     // 创建预览URL
+//     const previewUrl = URL.createObjectURL(file);
+//     user.value.avatarUrl = previewUrl;
+    
+//     try {
+//       // 创建FormData并上传文件
+//       const formData = new FormData();
+//       formData.append('file', file);
+      
+//       const response = await apiClient.post('/api/upload-avatar', formData, {
+//         headers: {
+//           'Content-Type': 'multipart/form-data',
+//         },
+//       });
+      
+//       // 更新头像URL为服务器返回的URL
+//       // user.value.avatarUrl = response.data.avatar_url;
+//       showToast('头像更新成功');
+//       await userInfoStore.fetchUserProfile();
+//     } catch (error) {
+//       console.error('头像上传失败', error);
+//       showToast('头像上传失败');
+//     } finally {
+//       // 重置文件输入框
+//       target.value = '';
+//     }
+//   }
+// };
 
 // 编辑昵称
 const editNickname = () => {
@@ -293,6 +355,7 @@ const onOversize = () => {
 };
 
 // 照片上传处理
+
 const afterRead = async (file: any) => {
   file.status = 'uploading';
   file.message = '上传中...';
@@ -301,6 +364,7 @@ const afterRead = async (file: any) => {
     const formData = new FormData();
     formData.append('file', file.file);
     
+    // 调用上传照片接口
     const response = await apiClient.post('/api/upload-photo', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -319,7 +383,47 @@ const afterRead = async (file: any) => {
     console.error('照片上传失败', error);
     file.status = 'failed';
     file.message = '上传失败';
-    showToast('照片上传失败');
+    showToast('error');
+  }
+};
+
+// 更新删除照片函数
+const deletePhoto = async (file: any) => {
+  try {
+    // 获取要删除的照片名称
+    const photoName = file.file?.name || file.url?.split('/').pop();
+    if (!photoName) {
+      showToast('无法获取照片信息');
+      return;
+    }
+
+    // 发送删除请求 - 确保包含正确的请求体
+    await apiClient.post('/api/delete-photo', { 
+      photo_name: photoName 
+    });
+
+        // 直接更新 store 中的 photo 信息
+    if (userInfoStore.profile?.photo) {
+      // 分割照片字符串为数组
+      const photos = userInfoStore.profile.photo.split(',');
+      // 过滤掉被删除的照片
+      const updatedPhotos = photos.filter(p => p !== photoName);
+      // 更新 store 中的 photo 字段
+      userInfoStore.profile.photo = updatedPhotos.join(',');
+    }
+
+    // 更新本地状态
+    const index = fileList.value.findIndex(f => f.url.includes(photoName));
+    if (index !== -1) {
+      fileList.value.splice(index, 1);
+      userPhotos.value = fileList.value.map(f => f.url.split('/').pop());
+      await savePhotos();
+    }
+
+    showToast('照片删除成功');
+  } catch (error) {
+    console.error('照片删除失败', error);
+    showToast('照片删除失败');
   }
 };
 
@@ -327,7 +431,7 @@ const afterRead = async (file: any) => {
 const savePhotos = async () => {
   try {
     await apiClient.post('/api/save-photos', {
-      photos: userPhotos.value.join(',')
+      photos: userPhotos.value
     });
     
     // 更新用户信息

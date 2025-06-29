@@ -13,10 +13,12 @@
     "prepare": "node -e \"if(require('fs').existsSync('.git')){process.exit(1)}\" || is-ci || husky install"
   },
   "dependencies": {
+    "@squoosh/lib": "^0.3.1",
     "@vant/area-data": "^2.0.0",
     "@vueuse/core": "^13.3.0",
     "axios": "^1.9.0",
     "base64-js": "^1.5.1",
+    "browser-image-compression": "^2.0.2",
     "compressorjs": "^1.2.1",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.13",
