@@ -1,5 +1,17 @@
 <template>
+
   <div class="profile-setup-container">
+    <!-- 添加悬浮返回按钮 -->
+    <van-floating-bubble
+      v-model:offset="offset"
+      axis="xy"
+      magnetic="x"
+      icon="revoke"
+      :size="54"
+      :gap="10"
+      @click="goBack"
+      style="--van-floating-bubble-background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);"
+    />
     <!-- 顶部进度条 -->
     <div class="progress-container">
       <div class="progress-bar">
@@ -355,12 +367,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast,showFailToast,showSuccessToast, Calendar, Popup, Icon, Field } from 'vant';
+import { Area, Swipe, SwipeItem, DatePicker, TimePicker, Toast,showFailToast,showSuccessToast, Calendar, Popup, Icon, Field, FloatingBubble  } from 'vant';
 import { areaList } from '@vant/area-data';
 import lunisolar from 'lunisolar';
 import apiClient from '@/plugins/axios';
 import { useUserInfoStore } from '@/store/userinfo'
-
+import { getPreviousRoute } from '@/utils/routeHistory';
 
 const userStore = useUserInfoStore()
 const router = useRouter();
@@ -381,6 +393,8 @@ const maxDate = new Date(2100, 12, 31);
 
 const showAreaPicker = ref(false);
 const showReligionPicker = ref(false);
+
+const offset = ref({ x: 20, y: 40 });
 // 直接使用导入的areaList数据
 
 // 表单数据
@@ -417,6 +431,15 @@ const onDateConfirm = (params:any) => {
   // 将选择的年月日转换为 Date 对象存储
   formData.value.birthDate = new Date(parseInt(selectedValues[0]), parseInt(selectedValues[1]) - 1, parseInt(selectedValues[2]));
   showDatePicker.value = false;
+};
+
+const goBack = () => {
+  const previousRoute = getPreviousRoute();
+  if (previousRoute) {
+    router.replace({ path: previousRoute.path, query: previousRoute.query, params: previousRoute.params });
+  } else {
+    router.replace('/home');
+  }
 };
 
 const formatSolar = (date: Date | null) => {
@@ -1342,5 +1365,39 @@ onMounted(() => {
 
 .btn-secondary:active {
   background-color: #E0E0E0;
+}
+
+/* 添加悬浮按钮样式 */
+.floating-back-btn {
+  position: fixed;
+  z-index: 9999;
+  bottom: 80px;
+  right: 20px;
+  background-color: #D75670;
+  box-shadow: 0 4px 12px rgba(215, 86, 112, 0.3);
+}
+
+.floating-back-btn:active {
+  transform: scale(0.95);
+  transition: transform 0.2s;
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+  .floating-back-btn {
+    bottom: 70px;
+    right: 15px;
+    transform: scale(0.9);
+  }
+}
+
+:deep(.van-floating-bubble) {
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(255, 154, 158, 0.5);
+}
+
+:deep(.van-floating-bubble__icon) {
+  color: white;
+  font-size: 20px;
 }
 </style>

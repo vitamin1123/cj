@@ -102,7 +102,7 @@
         
         <div class="upload-tips">
           <p>最多可上传6张照片</p>
-          <p>支持JPG、PNG格式，单张不超过5MB</p>
+          <p>第一张公开显示，剩下的展示给互相喜欢的用户</p>
         </div>
       </div>
     </van-popup>
@@ -112,7 +112,7 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Toast, showToast } from 'vant';
+import { Toast, showToast, showLoadingToast, closeToast  } from 'vant';
 import apiClient from '@/plugins/axios';
 import { useUserInfoStore } from '@/store/userinfo';
 import { useLikeStore } from '@/store/likeStore';
@@ -214,27 +214,36 @@ const handleAvatarChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (file) {
-    
-    // 检查文件类型
-    if (!file.type.startsWith('image/')) {
-      showToast('请选择图片文件');
-      return;
-    }
+    // 显示压缩提示
+    const toast = showLoadingToast({
+      message: '图片压缩中...',
+      duration: 0,
+      forbidClick: true,
+    });
     
     try {
-      // 压缩图片
-      const options = {
-        maxSizeMB: 0.5,          // 目标大小0.5MB
-        maxWidthOrHeight: 800,   // 限制宽高
-        useWebWorker: true,      // 使用WebWorker加速
-        fileType: file.type,     // 保持原始文件类型
-      };
-      
-      const compressedFile = await imageCompression(file, options);
-      
-      // 创建预览URL
-      const previewUrl = URL.createObjectURL(compressedFile);
+      // 创建预览URL（立即显示预览）
+      const previewUrl = URL.createObjectURL(file);
       user.value.avatarUrl = previewUrl;
+      
+      // 使用Compressor.js进行压缩
+      const compressedFile = await new Promise<File>((resolve, reject) => {
+        new Compressor(file, {
+          quality: 0.8,           // 质量设置
+          maxWidth: 1200,         // 最大宽度
+          maxHeight: 1200,        // 最大高度
+          convertSize: 1 * 1024 * 1024, // 超过1MB的图片进行格式转换
+          success(result) {
+            resolve(new File([result], file.name, {
+              type: result.type,
+              lastModified: Date.now(),
+            }));
+          },
+          error(err) {
+            reject(err);
+          }
+        });
+      });
       
       // 创建FormData并上传文件
       const formData = new FormData();
@@ -254,6 +263,7 @@ const handleAvatarChange = async (event: Event) => {
     } finally {
       // 重置文件输入框
       target.value = '';
+      closeToast();
     }
   }
 };
@@ -355,37 +365,109 @@ const onOversize = () => {
 };
 
 // 照片上传处理
-
 const afterRead = async (file: any) => {
-  file.status = 'uploading';
-  file.message = '上传中...';
+  // 处理多文件上传情况
+  const files = Array.isArray(file) ? file : [file];
+  
+  // 显示进度提示
+  const toast = showLoadingToast({
+    message: '照片处理中...',
+    duration: 0,
+    forbidClick: true,
+  });
   
   try {
-    const formData = new FormData();
-    formData.append('file', file.file);
-    
-    // 调用上传照片接口
-    const response = await apiClient.post('/api/upload-photo', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    
-    // 更新照片列表
-    userPhotos.value.push(response.data.filename);
+    for (const f of files) {
+      f.status = 'uploading';
+      f.message = '处理中...';
+      
+      try {
+        // 使用Compressor.js压缩照片
+        const compressedFile = await new Promise<File>((resolve, reject) => {
+          new Compressor(f.file, {
+            quality: 0.75,           // 稍低的质量设置（照片比头像要求低）
+            maxWidth: 1200,          // 更大的宽度（照片可能需要更多细节）
+            maxHeight: 1600,
+            convertSize: 1 * 1024 * 1024, // 超过1.5MB的图片进行格式转换
+            success(result) {
+              resolve(new File([result], f.file.name, {
+                type: result.type,
+                lastModified: Date.now(),
+              }));
+            },
+            error(err) {
+              reject(err);
+            }
+          });
+        });
+        
+        const formData = new FormData();
+        formData.append('file', compressedFile, f.file.name);
+        
+        // 调用上传照片接口
+        const response = await apiClient.post('/api/upload-photo', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        
+        // 更新照片列表
+        userPhotos.value.push(response.data.filename);
+        
+        f.status = 'done';
+        f.message = '上传成功';
+        
+        // 更新进度提示
+        toast.message = `已处理 ${userPhotos.value.length} 张照片`;
+        
+      } catch (error) {
+        console.error('照片处理失败', error);
+        f.status = 'failed';
+        f.message = '处理失败';
+      }
+    }
     
     // 保存到用户资料
     await savePhotos();
+    showToast('照片上传完成');
     
-    file.status = 'done';
-    file.message = '上传成功';
   } catch (error) {
     console.error('照片上传失败', error);
-    file.status = 'failed';
-    file.message = '上传失败';
-    showToast('error');
+    showToast('照片上传失败');
+  } finally {
+    closeToast();
   }
 };
+// const afterRead = async (file: any) => {
+//   file.status = 'uploading';
+//   file.message = '上传中...';
+  
+//   try {
+//     const formData = new FormData();
+//     formData.append('file', file.file);
+    
+//     // 调用上传照片接口
+//     const response = await apiClient.post('/api/upload-photo', formData, {
+//       headers: {
+//         'Content-Type': 'multipart/form-data',
+//       },
+//     });
+    
+//     // 更新照片列表
+//     userPhotos.value.push(response.data.filename);
+    
+//     // 保存到用户资料
+//     await savePhotos();
+    
+//     file.status = 'done';
+//     file.message = '上传成功';
+//   } catch (error) {
+//     console.error('照片上传失败', error);
+//     file.status = 'failed';
+//     file.message = '上传失败';
+//     showToast('error');
+//   }
+// };
 
 // 更新删除照片函数
 const deletePhoto = async (file: any) => {

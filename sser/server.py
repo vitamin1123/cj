@@ -11,6 +11,7 @@ import hmac
 import jwt
 import os
 import uuid
+import asyncio
 from sqlalchemy import event, func
 from sqlalchemy.sql import text
 from sqlalchemy import delete
@@ -30,7 +31,7 @@ app = FastAPI()
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "81231231231214f4b"  # 替换为强密钥
+JWT_SECRET = "123123123-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -46,7 +47,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "123123",  # 请替换为您的正式AppSecret
+    "secret": "12312312321",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -70,6 +71,7 @@ class User(SQLModel, table=True):
     mem_pri: str = Field(default=None)
     avatar: str = Field(default=None)
     photo: str = Field(default=None)
+    first_photo: str = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(beijing_tz))
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(beijing_tz),
@@ -233,6 +235,53 @@ async def get_current_time():
         "timezone": "UTC+8"
     }
 
+@app.get("/newcomers")
+@cache(expire=60)  # Cache for 1 minute to reduce database load
+async def get_newcomers():
+    """
+    Get the 10 newest users ordered by created_at (descending)
+    Returns: {
+        "newcomers": [list of user profiles],
+        "count": total number of newcomers
+    }
+    """
+    with Session(engine) as session:
+        try:
+            # Query the 10 newest users
+            stmt = (
+                select(User)
+                .order_by(User.created_at.desc())
+                .limit(10)
+            )
+            
+            newcomers = session.exec(stmt).all()
+            
+            # Get total count of users (for potential pagination)
+            count_stmt = select(func.count(User.id))
+            total_count = session.exec(count_stmt).scalar()
+            
+            # Convert to list of dictionaries, excluding sensitive fields
+            newcomers_list = []
+            for user in newcomers:
+                user_data = user.model_dump(
+                    exclude={"openid", "mem_pri", "phone"}
+                )
+                # Ensure we only show first photo to non-matched users
+                if user_data.get("photo"):
+                    user_data["photo"] = user.first_photo if user.first_photo else ""
+                newcomers_list.append(user_data)
+            
+            return {
+                "newcomers": newcomers_list,
+                "count": total_count
+            }
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch newcomers: {str(e)}"
+            )
+
 # 新增照片上传接口
 @app.post("/upload-photo")
 async def upload_photo(
@@ -277,36 +326,42 @@ async def upload_photo(
     return {"filename": unique_filename}
 
 # 新增照片删除接口
+class DeletePhotoRequest(BaseModel):
+    photo_name: str
+
 @app.post("/delete-photo")
 async def delete_photo(
-    photo_name: str,
+    request: DeletePhotoRequest,
     openid: str = Depends(get_current_user)
 ):
-    # 检查文件名是否有效
-    if not photo_name or '/' in photo_name or '\\' in photo_name:
+    # 添加日志记录接收到的请求
+    print(f"Deleting photo: {request.photo_name} for user: {openid}")
+
+    # 安全检查
+    if not request.photo_name or any(c in request.photo_name for c in ['/', '\\', '..']):
         raise HTTPException(status_code=400, detail="无效的文件名")
 
-    file_path = os.path.join(UPLOAD_PHOTO_DIR, photo_name)
-    
+    file_path = os.path.join(UPLOAD_PHOTO_DIR, request.photo_name)
+
     # 检查文件是否存在
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="照片不存在")
-    
-    # 从用户照片列表中移除
+
+    # 数据库操作
     with Session(engine) as session:
         user = session.exec(select(User).where(User.openid == openid)).first()
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        
+
         # 更新照片列表
-        photos = user.photo.split(',') if user.photo else []
-        if photo_name in photos:
-            photos.remove(photo_name)
+        photos = [p for p in user.photo.split(',') if p] if user.photo else []
+        if request.photo_name in photos:
+            photos.remove(request.photo_name)
             user.photo = ','.join(photos)
             session.add(user)
             session.commit()
-    
-    # 删除物理文件
+
+    # 删除文件
     try:
         os.remove(file_path)
         return {"status": "success", "message": "照片删除成功"}
@@ -321,12 +376,12 @@ async def save_photos(
 ):
     photos_list = photos_data.get("photos", [])
     photos_str = ','.join(photos_list)
-    
+
     with Session(engine) as session:
         user = session.exec(select(User).where(User.openid == openid)).first()
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        
+
         # 清理不再使用的照片
         old_photos = user.photo.split(',') if user.photo else []
         for old_photo in old_photos:
@@ -337,12 +392,13 @@ async def save_photos(
                         os.remove(old_path)
                 except Exception as e:
                     print(f"警告: 无法删除旧照片 {old_photo}: {str(e)}")
-        
+
         # 更新照片列表
         user.photo = photos_str
+        user.first_photo = photos_list[0] if photos_list else None
         session.add(user)
         session.commit()
-    
+
     return {"status": "success", "message": "照片列表保存成功"}
 
 # 图片压缩函数
@@ -350,17 +406,17 @@ def compress_image(file_path):
     try:
         from PIL import Image
         img = Image.open(file_path)
-        
+
         # 设置最大尺寸
         max_size = 800
         if max(img.size) > max_size:
             ratio = max_size / max(img.size)
             new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
             img = img.resize(new_size, Image.LANCZOS)
-        
+
         # 设置质量参数
         quality = 80
-        
+
         # 如果是PNG且尺寸较大，转换为JPG
         if file_path.lower().endswith('.png') and max(img.size) > 500:
             output_path = os.path.splitext(file_path)[0] + '.jpg'
@@ -368,13 +424,14 @@ def compress_image(file_path):
             img.save(output_path, 'JPEG', quality=quality)
             os.remove(file_path)  # 删除原PNG文件
             return output_path
-        
+
         # 保存压缩后的图片
         img.save(file_path, quality=quality)
         return file_path
     except Exception as e:
         print(f"图片压缩失败: {str(e)}")
         return file_path
+
 
 # 在User模型后添加UserLike模型
 class UserLike(SQLModel, table=True):
@@ -634,18 +691,80 @@ async def get_profile(
             raise HTTPException(status_code=404, detail="用户资料未找到")
         return user.model_dump(exclude={"openid"})
 
+#@app.get("/user/{user_id}")
+#async def get_user_by_id(
+#    user_id: int,
+#    openid: str = Depends(get_current_user)
+#):
+#    with Session(engine) as session:
+#        user = session.exec(select(User).where(User.id == user_id)).first()
+#        if not user:
+#            raise HTTPException(status_code=404, detail="用户未找到")
+#
+#        # 直接返回原始数据，不进行任何处理
+#        return user.model_dump(exclude={"openid", "mem_pri", "phone"})
 @app.get("/user/{user_id}")
 async def get_user_by_id(
     user_id: int,
     openid: str = Depends(get_current_user)
 ):
     with Session(engine) as session:
-        user = session.exec(select(User).where(User.id == user_id)).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="用户未找到")
+        try:
+            # 1. 一次性获取当前用户ID和目标用户信息
+            # 查询当前用户ID
+            current_user_id_result = session.execute(
+                select(User.id).where(User.openid == openid)
+            ).first()
 
-        # 直接返回原始数据，不进行任何处理
-        return user.model_dump(exclude={"openid", "mem_pri", "phone"})
+            if not current_user_id_result:
+                raise HTTPException(status_code=404, detail="当前用户未找到")
+
+            current_user_id = current_user_id_result[0]
+
+            # 查询目标用户信息
+            target_user = session.exec(
+                select(User).where(User.id == user_id)
+            ).first()
+
+            if not target_user:
+                raise HTTPException(status_code=404, detail="目标用户未找到")
+
+            # 2. 检查双方喜欢状态（使用单个查询）
+            like_query = text("""
+                SELECT
+                    (SELECT COUNT(*) FROM user_likes
+                     WHERE liker_id = :current_id AND liked_id = :target_id) AS i_liked,
+                    (SELECT COUNT(*) FROM user_likes
+                     WHERE liker_id = :target_id AND liked_id = :current_id) AS they_liked
+            """)
+
+            like_result = session.execute(like_query, {
+                "current_id": current_user_id,
+                "target_id": user_id
+            }).fetchone()
+
+            # 3. 准备返回数据
+            user_data = target_user.model_dump(
+                exclude={"openid", "mem_pri", "phone"}
+            )
+
+            # 4. 添加喜欢状态信息
+            user_data["i_liked"] = like_result.i_liked > 0
+            user_data["they_liked"] = like_result.they_liked > 0
+
+            # 5. 处理照片字段
+            if current_user_id == user_id or (user_data["i_liked"] and user_data["they_liked"]):
+                # 返回完整照片列表
+                user_data["photo"] = target_user.photo
+            else:
+                # 只返回第一张照片
+                user_data["photo"] = target_user.first_photo if target_user.first_photo else ""
+
+            return user_data
+
+        except Exception as e:
+            print(f"获取用户详情出错: {str(e)}")
+            raise HTTPException(status_code=500, detail="服务器内部错误")
 
 @app.get("/explore_people")
 async def explore_people():
@@ -667,7 +786,7 @@ async def explore_people():
                                 'mem', mem,
                                 'nickname', nickname,
                                 'occupation', occupation,
-                                'photo', photo,
+                                'photo', first_photo,
                                 'region_code', region_code,
                                 'weight', weight
                             )

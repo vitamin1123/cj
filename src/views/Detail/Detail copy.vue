@@ -2,7 +2,7 @@
   <div class="detail-container">
     <div class="header">
       <van-icon name="arrow-left" class="back-icon" @click="goBack" />
-      <span class="header-title">编号{{ userInfo.id }}</span>
+      <span class="header-title">详细信息</span>
       <div class="header-right">
         <van-icon name="like" class="heart-icon" :class="{ liked: isLocalLiked }" @click="toggleLike" />
       </div>
@@ -114,31 +114,29 @@
         <div class="photo-gallery-container">
           <div v-if="!isUnlocked" class="glass-overlay">
             <div class="gradient-border"></div>
-            <div class="unlock-status">
-              <div class="heart-status">
-                <span :class="{ 'liked': userInfo.they_liked }">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="like-heart-icon"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                  对方{{ userInfo.they_liked ? '已' : '未' }}解锁
-                </span>
-                <span :class="{ 'liked': userInfo.i_liked }">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="like-heart-icon"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                  我{{ userInfo.i_liked ? '已' : '未' }}解锁
-                </span>
-              </div>
- 
-            </div>
-
-            <!-- 新增：毛玻璃中的照片孔洞 -->
-            <div class="photo-hole" :style="holePositionStyle">
-              <img :src="photoBaseUrl + userInfo.first_photo" alt="User photo 1">
-              <div class="photo-vignette"></div>
-            </div>
+        <div class="unlock-status">
+          <div class="heart-status">
+            <span :class="{ 'liked': userInfo.they_liked }">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="like-heart-icon"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              对方{{ userInfo.they_liked ? '已' : '未' }}解锁
+            </span>
+            <span :class="{ 'liked': userInfo.i_liked }">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="like-heart-icon"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              我{{ userInfo.i_liked ? '已' : '未' }}解锁
+            </span>
+          </div>
+          <div class="unlock-prompt">互相喜欢后解锁全部照片</div>
+        </div>
           </div>
 
           <div class="new-photo-grid">
             <template v-if="!isUnlocked">
-              
-              <div v-for="i in 6" :key="'placeholder-' + i" class="new-photo-item placeholder"></div>
+              <div class="new-photo-item lift-up" @click="previewSinglePhoto(photoBaseUrl + userInfo.first_photo)">
+              <img :src="photoBaseUrl + userInfo.first_photo" alt="User photo 1">
+              <!-- 添加边缘透明层 -->
+              <div class="edge-blur"></div>
+            </div>
+            <div v-for="i in 5" :key="'placeholder-' + i" class="new-photo-item placeholder"></div>
             </template>
             <template v-else>
               <div v-for="(photoUrl, index) in unlockedPhotoList" :key="index" class="new-photo-item" @click="previewUnlockedPhotos(index)">
@@ -150,34 +148,24 @@
       </div>
 
     </div>
-    <van-floating-bubble
-      v-model:offset="bubbleOffset"
-      icon="share"
-      magnetic="x"
-      @click="handleShare"
-      style="--van-floating-bubble-background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import { useRouter, useRoute  } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { getPreviousRoute } from '@/utils/routeHistory';
-import { showImagePreview, showToast, ShareSheet   } from 'vant';
+import { showImagePreview, showToast } from 'vant';
 import { areaList } from '@vant/area-data'; 
 import apiClient from '@/plugins/axios';
 import { likeUser } from '@/api/like';
 import { useLikeStore } from '@/store/likeStore';
 
-import { initWechatSDK, setWechatShareInfo } from '@/utils/wechat';
-
 const likeStore = useLikeStore();
 const router = useRouter();
-const route = useRoute();
 const userInfo = ref<Record<string, any>>({});
 const photoBaseUrl = '/photo/'; // 统一的照片基础路径
-const bubbleOffset = ref({ x: 0.85 * window.innerWidth, y: 0.8 * window.innerHeight });
+
 // --- 核心修改：照片墙相关计算属性 ---
 
 // 判断照片墙是否解锁
@@ -195,53 +183,11 @@ const unlockedPhotoList = computed(() => {
 });
 
 // --- 原始脚本内容 (保留) ---
-const holePositionStyle = computed(() => {
-  return {
-    'grid-row': '1',
-    'grid-column': '1'
-  };
-});
+
 const isLocalLiked = computed(() => {
   const userId = parseInt(router.currentRoute.value.params.id as string);
   return likeStore.hasLiked(userId);
 });
-
-// 新增：处理分享
-const handleShare = async () => {
-  try {
-    // 1. 获取当前页面URL（去除hash）
-    const currentUrl = window.location.href.split('#')[0];
-    
-    // 2. 初始化微信SDK
-    await initWechatSDK(currentUrl);
-    
-    // 3. 设置分享内容
-    const shareTitle = `编号${userInfo.value.id} ${userInfo.value.birth_date ? new Date(userInfo.value.birth_date).getFullYear() : ''}年`;
-    let shareDesc = userInfo.value.mem || '暂无个人简介';
-    if (shareDesc.length > 20) {
-      shareDesc = shareDesc.substring(0, 20) + '...';
-    }
-    const shareImg = userInfo.value.first_photo 
-      ? `${window.location.origin}/photo/${userInfo.value.first_photo}`
-      : `${window.location.origin}/tianshun.jpg`;
-    const shareLink = `${window.location.origin}/detail/${route.params.id}`;
-    console.log('shareLink', shareLink,shareImg)
-    setWechatShareInfo({
-      title: shareTitle,
-      desc: shareDesc,
-      link: shareLink,
-      imgUrl: shareImg,
-      success: () => showToast('分享成功'),
-      cancel: () => showToast('分享已取消')
-    });
-    
-    showToast('点击右上角分享给朋友');
-  } catch (error) {
-    console.error('微信分享失败:', error);
-    showToast('分享功能初始化失败');
-  }
-};
-
 
 const getDefaultAvatarUrl = () => {
   const gender = userInfo.value.gender || 'male';
@@ -493,68 +439,6 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   z-index: 10;
-  background-color: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 8px;
-  padding: 0;
-  clip-path: none;
-  border-radius: 16px;
-}
-
-.photo-hole {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: 12px;
-  overflow: hidden;
-  background-color: transparent;
-  z-index: 15;
-}
-
-.photo-hole img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.photo-vignette {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(
-    circle at center, 
-    rgba(255, 255, 255, 0) 0%, 
-    rgba(255, 255, 255, 0) 40%, 
-    rgba(255, 255, 255, 0.9) 100%
-  );
-  pointer-events: none;
-  border-radius: 12px;
-}
-
-.unlock-status {
-  position: absolute;
-  bottom: 40px;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  z-index: 20;
-}
-
-.glass-overlay-bak {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
   overflow: hidden;
   background-color: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(25px);
@@ -636,7 +520,14 @@ onMounted(() => {
   height: 20px;
 }
 
-
+.unlock-prompt {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(60, 60, 67, 0.75);
+  background-color: rgba(255, 255, 255, 0.6);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
 
 .new-photo-grid {
   display: grid;
@@ -738,17 +629,6 @@ onMounted(() => {
   z-index: 20;
   box-shadow: none;
   transform: scale(1.05);
-}
-
-/* 新增：浮动气泡样式调整 */
-:deep(.van-floating-bubble) {
-  z-index: 9999;
-  box-shadow: 0 4px 12px rgba(255, 154, 158, 0.5);
-}
-
-:deep(.van-floating-bubble__icon) {
-  color: white;
-  font-size: 20px;
 }
 
 </style>

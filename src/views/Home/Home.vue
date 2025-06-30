@@ -70,7 +70,7 @@
 
       <!-- 新人展示 -->
       <div class="newcomer-section">
-        <h2 class="section-title">天顺新面孔</h2>
+        <!-- <h2 class="section-title">天顺新面孔</h2>
         <van-swipe class="newcomer-swipe" :loop="true" :width="180" :height="80" :autoplay="5000" indicator-color="transparent">
           <van-swipe-item v-for="i in 4" :key="i">
             <div class="newcomer-card">
@@ -81,7 +81,32 @@
               </div>
             </div>
           </van-swipe-item>
-        </van-swipe>
+        </van-swipe> -->
+          <h2 class="section-title">天顺新面孔</h2>
+  <van-swipe 
+    class="newcomer-swipe" 
+    :loop="true" 
+    :width="180" 
+    :height="80" 
+    :autoplay="5000" 
+    indicator-color="transparent"
+  >
+    <van-swipe-item v-for="(user, index) in newcomers" :key="index">
+      <div class="newcomer-card" @click="goToDetail(user.id)">
+        <div class="avatar">
+          <img 
+            :src="user.avatarUrl" 
+            alt="头像"
+            style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;"
+          />
+        </div>
+        <div class="info">
+          <div class="title">{{ user.displayTitle }}</div>
+          <div class="subtitle">{{ user.displaySubtitle }}</div>
+        </div>
+      </div>
+    </van-swipe-item>
+  </van-swipe>
       </div>
 
       <!-- 推荐板块 -->
@@ -144,7 +169,7 @@ const isLoading = ref(true);
 const authError = ref<string | null>(null);
 const authStore = useAuthStore();
 const likeStore = useLikeStore();
-
+const newcomers = ref<any[]>([]);
 
 const checkAuth = async () => {
   isLoading.value = true;
@@ -159,6 +184,27 @@ const checkAuth = async () => {
   }
 };
 
+// 获取新人数据的方法
+const fetchNewcomers = async () => {
+  try {
+    const response = await apiClient.get('/api/newcomers');
+    newcomers.value = response.data.newcomers.map((user: any, index: number) => ({
+      ...user,
+      // 格式化显示标题和副标题
+      displayTitle: `编号${user.id}`,
+      displaySubtitle: user.birth_date ? new Date(user.birth_date).getFullYear() + '年' : '未知',
+      // 处理头像URL
+      avatarUrl: user.first_photo 
+        ? `/photo/${user.first_photo}` 
+        : `/avatars/${user.gender === 'female' ? 'female_def.png' : 'male_def.png'}`
+    }));
+  } catch (error) {
+    console.error('获取新人数据失败:', error);
+  }
+};
+
+
+
 const retryAuth = () => {
   checkAuth();
 };
@@ -168,6 +214,7 @@ onMounted(async() => {
   await userListStore.initializeStore();
   await userStore.fetchUserProfile();
   await likeStore.fetchLikes()
+  await fetchNewcomers();
 });
 
 const handleSearchFocus = () => {
