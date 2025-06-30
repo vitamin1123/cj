@@ -215,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, onDeactivated, nextTick, toRefs } from 'vue';
+import { ref, computed, onMounted, onActivated, onDeactivated, nextTick } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { Toast, showFailToast, showSuccessToast } from 'vant';
@@ -231,21 +231,6 @@ import { useVirtualList, useScroll } from '@vueuse/core'; // 引入虚拟列表
 import { useUserListStore } from '@/store/userList';
 import { useUserInfoStore } from '@/store/userinfo';
 import { useLikeStore } from '@/store/likeStore';
-import { useExploreStore } from '@/store/exploreStore';
-
-const exploreStore = useExploreStore();
-
-const {
-  searchKeyword,
-  heightFilter,
-  selectedAreaCode,
-  selectedAreaText,
-  startYear,
-  endYear,
-  selectedZodiacs,
-  genderFilterState,
-  locationFilterActive
-} = toRefs(exploreStore.state);
 
 const viewStateStore = useViewStateStore();
 const { exploreScrollPosition } = storeToRefs(viewStateStore);
@@ -253,6 +238,8 @@ const { setExploreScrollPosition } = viewStateStore;
 const userStore = useUserInfoStore();
 const likeStore = useLikeStore();
 const currentUser = computed(() => userStore.profile);
+const selectedAreaCode = ref(''); // 存储选择的区域代码
+const selectedAreaText = ref(''); // 存储选择的区域文本
 const showAreaPicker = ref(false);
 // 两个列表：全部数据和过滤后的数据
 const allPeopleList = ref<Person[]>([]);
@@ -270,6 +257,8 @@ const peopleGridRef = containerProps.ref;
 // const scrollPosition = ref(0);
 
 const showBirthYearPicker = ref(false);
+const startYear = ref(['1980']); // 默认起始年份
+const endYear = ref(['2020']);   // 默认结束年份
 const minDate = new Date(1950, 0, 1);
 const maxDate = new Date(2025, 11, 31);
 // 计算生日年份显示文本
@@ -281,27 +270,10 @@ const birthYearDisplay = computed(() => {
 });
 
 // 修改筛选标签 - 支持多选独立模式
-const filters = computed<Filter[]>(() => [
-  { 
-    id: 1, 
-    label: '同城', 
-    active: locationFilterActive.value, 
-    type: 'location' 
-  },
-  { 
-    id: 2, 
-    label: '只看男', 
-    active: genderFilterState.value === 1, 
-    type: 'gender', 
-    value: 'male' 
-  },
-  { 
-    id: 3, 
-    label: '只看女', 
-    active: genderFilterState.value === 2, 
-    type: 'gender', 
-    value: 'female' 
-  },
+const filters = ref<Filter[]>([
+  { id: 1, label: '同城', active: false, type: 'location' },
+  { id: 2, label: '只看男', active:false, type: 'gender', value: 'male' },
+  { id: 3, label: '只看女', active: false, type: 'gender', value: 'female' },
 ]);
 
 const yearFormatter = (type: string, option: any) => {
@@ -350,14 +322,12 @@ const confirmAreaSelection = ({ selectedOptions }: { selectedOptions: Array<{ te
 const clearAreaSelection = () => {
   selectedAreaCode.value = '';
   selectedAreaText.value = '';
-  exploreStore.saveState();
   handleSearch();
 };
 
 // 确认生日年份范围
 const confirmBirthYearRange = () => {
   showBirthYearPicker.value = false;
-  exploreStore.saveState(); // 添加这行
   handleSearch();
 };
 
@@ -430,10 +400,11 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const activeTab = ref('explore');
 const router = useRouter();
 const isSearchFocused = ref(false);
-
+const searchKeyword = ref('');
+const heightFilter = ref('');
 const regionFilter = ref('');
 const isZodiacExpanded = ref(false);
-
+const selectedZodiacs = ref<string[]>([]);
 
 // 生肖选项
 const zodiacOptions: ZodiacOption[] = [
@@ -562,7 +533,7 @@ const handleSearch = () => {
       }
       return true;
     }
-    exploreStore.saveState();
+    
     // 如果所有条件都满足或者没有关键词搜索，则保留
     return true;
   });
@@ -595,22 +566,28 @@ const highlightMem = (text: string, id: number): string => {
 
 
 
+
+// 性别筛选状态：0-取消选中，1-只看男，2-只看女
+const genderFilterState = ref<0 | 1 | 2>(0);
 // 修改后的toggleFilter函数
 const toggleFilter = (filter: Filter) => {
   if (filter.type === 'gender') {
-    // 处理性别筛选的三状态逻辑
-    if (filter.value === 'male') {
-      exploreStore.state.genderFilterState = 
-        exploreStore.state.genderFilterState === 1 ? 0 : 1;
-    } else if (filter.value === 'female') {
-      exploreStore.state.genderFilterState = 
-        exploreStore.state.genderFilterState === 2 ? 0 : 2;
+    // 如果是性别筛选，先取消所有性别筛选
+    const wasActive = filter.active;
+    filters.value.forEach(f => {
+      if (f.type === 'gender') f.active = false;
+    });
+    
+    // 如果点击的不是当前激活的筛选，则激活它
+    if (!wasActive) {
+      filter.active = true;
     }
-  } else if (filter.type === 'location') {
-    exploreStore.state.locationFilterActive = !exploreStore.state.locationFilterActive;
+  } else {
+    // 其他类型的筛选直接切换状态
+    filter.active = !filter.active;
   }
   
-  exploreStore.saveState();
+  // 重新应用筛选
   handleSearch();
 };
 const toggleFilter_bak = (filter: Filter) => {
@@ -666,7 +643,6 @@ const toggleZodiacSelection = (zodiac: string) => {
   } else {
     selectedZodiacs.value.splice(index, 1);
   }
-  exploreStore.saveState();
 };
 
 // 清空生肖选择
@@ -814,9 +790,12 @@ onDeactivated(() => {
 onMounted(async() => {
    const loaded = await loadUserProfiles();
    if (loaded) {
-    if (exploreStore.state.genderFilterState === 0) {
-      // 如果持久化状态是0，确保所有筛选标签都不激活
-      filters.value.forEach(f => f.active = false);
+    if (currentUser.value?.gender === 'male') {
+      const femaleFilter = filters.value.find(f => f.value === 'female');
+      if (femaleFilter) femaleFilter.active = true;
+    } else if (currentUser.value?.gender === 'female') {
+      const maleFilter = filters.value.find(f => f.value === 'male');
+      if (maleFilter) maleFilter.active = true;
     }
     handleSearch();
   }

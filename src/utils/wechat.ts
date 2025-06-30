@@ -88,7 +88,7 @@ export const setWechatShareInfo = (options: Partial<ShareOptions>): void => {
     title: '默认分享标题',
     desc: '默认分享描述',
     link: window.location.href,
-    imgUrl: 'https://example.com/default-share-image.png',
+    imgUrl: 'http://www.tianshunchenjie.com/photo/tianshun.png',
     success: () => {},
     cancel: () => {}
   };

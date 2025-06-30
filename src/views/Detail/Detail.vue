@@ -157,6 +157,21 @@
       @click="handleShare"
       style="--van-floating-bubble-background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);"
     />
+    <div v-if="showShareGuide" class="share-guide-overlay" @click="showShareGuide = false">
+      <!-- 扇形遮罩 -->
+      <div class="sector-mask"></div>
+      
+      <!-- 右上角高亮区域 -->
+      <div class="highlight-area">
+        <div class="dot-animation"></div>
+      </div>
+      
+      <!-- 提示文字 -->
+      <div class="guide-text">
+        点击右上角<span class="icon-more"></span><br>
+        分享给朋友
+      </div>
+    </div>
   </div>
 </template>
 
@@ -172,6 +187,7 @@ import { useLikeStore } from '@/store/likeStore';
 
 import { initWechatSDK, setWechatShareInfo } from '@/utils/wechat';
 
+const showShareGuide = ref(false); // 控制扇形遮罩引导
 const likeStore = useLikeStore();
 const router = useRouter();
 const route = useRoute();
@@ -234,11 +250,11 @@ const handleShare = async () => {
       success: () => showToast('分享成功'),
       cancel: () => showToast('分享已取消')
     });
-    
-    showToast('点击右上角分享给朋友');
+    showShareGuide.value = true;
+    // showToast('点击右上角分享给朋友');
   } catch (error) {
     console.error('微信分享失败:', error);
-    showToast('分享功能初始化失败');
+    showToast('分享功能初始化失败，请再次尝试');
   }
 };
 
@@ -749,6 +765,104 @@ onMounted(() => {
 :deep(.van-floating-bubble__icon) {
   color: white;
   font-size: 20px;
+}
+
+/* 扇形遮罩引导样式 */
+.share-guide-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 9998;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 20px;
+}
+
+.sector-mask {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 150px;
+  height: 150px;
+ 
+  pointer-events: none;
+}
+
+.highlight-area {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s infinite;
+}
+
+.dot-animation {
+  width: 20px;
+  height: 20px;
+  background: #ff4757;
+  border-radius: 50%;
+  animation: bounce 1.5s infinite;
+}
+
+.guide-text {
+  position: absolute;
+  top: 70px;
+  right: 20px;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: right;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: fadeInOut 2s infinite;
+}
+
+.icon-more {
+  display: inline-block;
+  font-size: 24px;
+  font-weight: bold;
+  transform: rotate(90deg);
+  margin: 0 5px;
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 20px rgba(255, 71, 87, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 71, 87, 0);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+@keyframes fadeInOut {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 </style>

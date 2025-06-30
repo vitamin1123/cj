@@ -82,6 +82,12 @@ const router = createRouter({
       meta: { title: '请在微信中打开' }
     },
     {
+      path: '/mana',
+      name: 'mana',
+      component: () => import('@/views/Mana/Mana.vue'),
+      meta: { title: '管理' }
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/404'
     }

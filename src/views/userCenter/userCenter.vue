@@ -527,7 +527,7 @@ const savePhotos = async () => {
 const menuItems = ref<MenuItem[]>([
   { id: 'profile-maintenance', label: '资料维护', route: '/profile-setup' },
   { id: 'photos', label: '我的照片', action: () => showPhotoPopup.value = true },
-  { id: 'mana', label: '管理', action: () => console.log('mana') },
+  { id: 'mana', label: '管理', route: '/mana'},
 ]);
 
 const tabs = [

@@ -1,3 +1,4 @@
+// /src/api/lik.ts
 import apiClient from '@/plugins/axios';
 
 export const likeUser = (likedId: number, action: 'like' | 'unlike') => {

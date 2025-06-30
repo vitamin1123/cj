@@ -12,6 +12,9 @@ import jwt
 import os
 import uuid
 import asyncio
+import random
+import time
+import string
 from sqlalchemy import event, func
 from sqlalchemy.sql import text
 from sqlalchemy import delete
@@ -31,7 +34,7 @@ app = FastAPI()
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "123123123-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_SECRET = "81efd3fc-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -47,7 +50,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "12312312321",  # 请替换为您的正式AppSecret
+    "secret": "f50e7a202c919ec681ed82b79598673b",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -235,8 +238,53 @@ async def get_current_time():
         "timezone": "UTC+8"
     }
 
+@app.get("/wechat/jssdk-signature")
+async def get_jssdk_signature(
+    url: str,  # 前端传递的当前页面URL
+    openid: str = Depends(get_current_user)  # 可选，根据业务需求
+):
+    """
+    生成微信JS-SDK签名
+    """
+    # 1. 获取access_token
+    token_url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={WECHAT_CONFIG['appid']}&secret={WECHAT_CONFIG['secret']}"
+    token_resp = requests.get(token_url)
+    token_data = token_resp.json()
+
+    if "access_token" not in token_data:
+        raise HTTPException(status_code=500, detail="获取access_token失败")
+
+    access_token = token_data["access_token"]
+
+    # 2. 获取jsapi_ticket
+    ticket_url = f"https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token={access_token}&type=jsapi"
+    ticket_resp = requests.get(ticket_url)
+    ticket_data = ticket_resp.json()
+
+    if ticket_data.get("errcode") != 0:
+        raise HTTPException(status_code=500, detail="获取jsapi_ticket失败")
+
+    jsapi_ticket = ticket_data["ticket"]
+
+    # 3. 生成签名
+    noncestr = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+    timestamp = str(int(time.time()))
+
+    # 注意：URL必须与前端页面完全一致
+    signature_str = f"jsapi_ticket={jsapi_ticket}&noncestr={noncestr}&timestamp={timestamp}&url={url}"
+
+    # 计算签名
+    signature = hashlib.sha1(signature_str.encode('utf-8')).hexdigest()
+
+    return {
+        "appId": WECHAT_CONFIG['appid'],
+        "timestamp": timestamp,
+        "nonceStr": noncestr,
+        "signature": signature
+    }
+
 @app.get("/newcomers")
-@cache(expire=60)  # Cache for 1 minute to reduce database load
+# @cache(expire=60)  # Cache for 1 minute to reduce database load
 async def get_newcomers():
     """
     Get the 10 newest users ordered by created_at (descending)
@@ -253,13 +301,13 @@ async def get_newcomers():
                 .order_by(User.created_at.desc())
                 .limit(10)
             )
-            
+
             newcomers = session.exec(stmt).all()
-            
-            # Get total count of users (for potential pagination)
+
+            # Get total count of users - 使用正确的 SQLAlchemy 2.0 方式
             count_stmt = select(func.count(User.id))
-            total_count = session.exec(count_stmt).scalar()
-            
+            total_count = session.scalar(count_stmt)  # 使用 session.scalar() 而不是 exec()
+
             # Convert to list of dictionaries, excluding sensitive fields
             newcomers_list = []
             for user in newcomers:
@@ -270,12 +318,12 @@ async def get_newcomers():
                 if user_data.get("photo"):
                     user_data["photo"] = user.first_photo if user.first_photo else ""
                 newcomers_list.append(user_data)
-            
+
             return {
                 "newcomers": newcomers_list,
                 "count": total_count
             }
-            
+
         except Exception as e:
             raise HTTPException(
                 status_code=500,
@@ -691,18 +739,120 @@ async def get_profile(
             raise HTTPException(status_code=404, detail="用户资料未找到")
         return user.model_dump(exclude={"openid"})
 
-#@app.get("/user/{user_id}")
-#async def get_user_by_id(
-#    user_id: int,
-#    openid: str = Depends(get_current_user)
-#):
-#    with Session(engine) as session:
-#        user = session.exec(select(User).where(User.id == user_id)).first()
-#        if not user:
-#            raise HTTPException(status_code=404, detail="用户未找到")
-#
-#        # 直接返回原始数据，不进行任何处理
-#        return user.model_dump(exclude={"openid", "mem_pri", "phone"})
+# 新增管理功能所需的模型
+class UserStatus(SQLModel, table=True):
+    __tablename__ = "user_status"
+    id: int = Field(primary_key=True, foreign_key="user.id")
+    state: int = Field(default=1)  # 0:禁用, 1:正常
+    expire_at: Optional[datetime] = Field(default=None)
+
+class UserTop(SQLModel, table=True):
+    __tablename__ = "user_top"
+    id: int = Field(primary_key=True, foreign_key="user.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(beijing_tz))
+
+# 用户管理响应模型
+class AdminUserResponse(BaseModel):
+    id: int
+    nickname: Optional[str]
+    gender: str
+    avatar: Optional[str]
+    like_count: int
+    is_top: bool
+
+# 更新用户状态请求模型
+class UpdateUserStatusRequest(BaseModel):
+    is_active: bool
+
+# 管理员工具函数
+def is_admin(openid: str) -> bool:
+    # 这里实现您的管理员验证逻辑
+    # 例如：检查openid是否在管理员列表中
+    ADMIN_LIST = ["oagEzvlgS2fE90_gROtw9XcH0ELU"]  # 替换为实际的管理员openid
+    return openid in ADMIN_LIST
+
+# 管理员依赖项
+async def get_admin_user(authorization: str = Header(...)) -> str:
+    openid = await get_current_user(authorization)
+    if not is_admin(openid):
+        raise HTTPException(status_code=403, detail="无管理权限")
+    return openid
+
+# 获取用户列表（带点赞数和状态）
+@app.get("/admin/users", response_model=list[AdminUserResponse])
+async def get_users_with_likes(
+    openid: str = Depends(get_admin_user),
+    gender: Optional[str] = None
+):
+    with Session(engine) as session:
+        # 构建基础SQL查询
+        sql = """
+        SELECT 
+            u.id,
+            u.nickname,
+            u.gender,
+            u.avatar,
+            COUNT(ul.liked_id) AS like_count,
+            us.state,
+            ut.id IS NOT NULL AS is_top,
+            us.expire_at
+        FROM 
+            user u
+        LEFT JOIN 
+            user_likes ul ON u.id = ul.liked_id
+        LEFT JOIN 
+            user_status us ON u.id = us.id
+        LEFT JOIN 
+            user_top ut ON u.id = ut.id
+        {where_clause}
+        GROUP BY 
+            u.id, u.nickname, u.gender, u.avatar, us.state, ut.id, us.expire_at
+        ORDER BY 
+            like_count DESC
+        """.format(
+            where_clause="WHERE u.gender = :gender" if gender else ""
+        )
+
+        # 执行查询
+        params = {"gender": gender} if gender else {}
+        result = session.execute(text(sql), params)
+        rows = result.mappings().all()  # 获取字典形式的结果
+
+        # 处理结果
+        users = []
+        for row in rows:
+            is_active = bool(row['state']) and (
+                not row['expire_at'] or row['expire_at'] > datetime.now(beijing_tz)
+            )
+            users.append({
+                "id": row['id'],
+                "nickname": row['nickname'],
+                "gender": row['gender'],
+                "avatar": row['avatar'],
+                "like_count": row['like_count'],
+                "is_active": is_active,
+                "is_top": bool(row['is_top'])
+            })
+
+        return users
+
+@app.post("/admin/users/{user_id}/status")
+async def update_user_active_status(
+    user_id: int,
+    request: UpdateUserStatusRequest,
+    openid: str = Depends(get_admin_user)
+):
+    with Session(engine) as session:
+        stmt = (
+            update(UserStatus)
+            .where(UserStatus.id == user_id)
+            .values(state=int(request.is_active))
+        )
+        session.exec(stmt)
+        session.commit()
+
+    return {"status": "success", "message": "用户状态已更新"}
+
 @app.get("/user/{user_id}")
 async def get_user_by_id(
     user_id: int,
