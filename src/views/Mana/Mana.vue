@@ -1,43 +1,71 @@
 <template>
   <div class="mana-container">
-    <!-- 标题栏 -->
-    <div class="header">
-      <h1 class="title">用户管理</h1>
+    <van-floating-bubble
+      v-model:offset="offset"
+      axis="xy"
+      magnetic="x"
+      icon="revoke"
+      :size="54"
+      :gap="10"
+      @click="goBack"
+      style="--van-floating-bubble-background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);"
+    />
+    <!-- 搜索和过滤栏（固定在顶部） -->
+    <div class="sticky-header" ref="headerRef">
+      <!-- 搜索框 -->
+      <div class="search-container">
+        <van-search
+          v-model="searchKeyword"
+          placeholder="搜索用户"
+          shape="round"
+          background="#F2EEE8"
+          @search="onSearch"
+        />
+      </div>
+      <!-- 过滤标签 -->
       <div class="filter-tabs">
         <span 
           class="filter-tab" 
           :class="{ active: activeTab === 'all' }"
-          @click="activeTab = 'all'"
+          @click="setActiveTab('all')"
         >
           全部用户
         </span>
         <span 
           class="filter-tab" 
           :class="{ active: activeTab === 'male' }"
-          @click="activeTab = 'male'"
+          @click="setActiveTab('male')"
         >
           男生
         </span>
         <span 
           class="filter-tab" 
           :class="{ active: activeTab === 'female' }"
-          @click="activeTab = 'female'"
+          @click="setActiveTab('female')"
         >
           女生
         </span>
+        <!-- <span 
+          class="filter-tab" 
+          :class="{ active: activeTab === 'top' }"
+          @click="setActiveTab('top')"
+        >
+          已置顶
+        </span> -->
       </div>
     </div>
 
-    <!-- 用户列表 -->
-    <div 
-      class="user-grid" 
-      v-bind="containerProps" 
-      :style="{ height: listHeight + 'px' }"
-    >
-      <div v-bind="wrapperProps">
+    <!-- 用户列表 - 使用Vant List组件 -->
+    <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
+      <van-list
+        v-model:loading="loading"
+        :finished="finished"
+        finished-text="没有更多了"
+        @load="onLoad"
+      >
         <div 
-          v-for="{ index, data: user } in virtualList" 
-          :key="index" 
+          v-for="user in list" 
+          :key="user.id" 
           class="user-card"
         >
           <div class="card-header">
@@ -63,7 +91,8 @@
               </van-image>
             </div>
             <div class="user-info">
-              <div class="name">{{ user.id +' ' +user.nickname }}</div>
+              <div class="name" v-if="user.nickname">{{ user.id +' ' + user.nickname }}</div>
+              <div class="name" v-else>{{ user.id }}</div>
               <div class="meta">
                 <span class="gender" :class="user.gender">{{ 
                   user.gender === 'male' ? '♂' : '♀' 
@@ -79,35 +108,56 @@
           </div>
           
           <div class="card-footer">
-            <div class="status">
-              <span class="status-badge" :class="{ 
-                active: user.state===1, 
-                inactive: user.state!=1 
-              }">
-                {{ user.state===1 ? '启用' : '禁用' }}
-              </span>
+            <!-- 到期时间 -->
+            <div class="expire">
+              {{ formatExpireDate(user.expire_at) }}
             </div>
-            <van-switch 
-              v-model="user.state" 
-              size="24px"
-              :loading="user.updating"
-              active-color="#D75670"
-              inactive-color="#EBE3D7"
-              @change="updateUserStatus(user)"
-            />
+            <div class="actions">
+              <!-- 置顶按钮 -->
+              <van-switch 
+                :model-value="user.is_top"
+                :loading="user.topping"
+                size="24px"
+                active-color="#FFA940"
+                inactive-color="#EBE3D7"
+                @change="toggleTopStatus(user, $event)"
+              >
+                <template #node>
+                  <div class="icon-wrapper">
+                    <van-icon 
+                      :name="user.is_top ? 'back-top' : 'minus'" 
+                      :color="user.is_top ? '#FFA940' : '#999'" 
+                    />
+                  </div>
+                </template>
+              </van-switch>
+              
+              <!-- 状态开关（使用图标） -->
+              <van-switch 
+                :model-value="user.state === 1"
+                :loading="user.updating"
+                size="24px"
+                active-color="#D75670"
+                inactive-color="#EBE3D7"
+                @change="updateUserStatus(user, $event)"
+              >
+                <template #node>
+                  <div class="icon-wrapper">
+                    <van-icon 
+                      :name="user.state === 1 ? 'success' : 'cross'" 
+                      :color="user.state === 1 ? '#D75670' : '#999'" 
+                    />
+                  </div>
+                </template>
+              </van-switch>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-container">
-      <van-loading type="spinner" color="#D75670" size="24px" />
-      <span>加载中...</span>
-    </div>
+      </van-list>
+    </van-pull-refresh>
 
     <!-- 无数据提示 -->
-    <div v-if="!loading && filteredUsers.length === 0" class="no-data">
+    <div v-if="!loading && list.length === 0 && finished" class="no-data">
       <van-icon name="user-o" size="48" color="#EBE3D7" />
       <p>暂无用户数据</p>
     </div>
@@ -116,7 +166,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useVirtualList } from '@vueuse/core';
+import { useRouter } from 'vue-router';
+import { getPreviousRoute } from '@/utils/routeHistory';
 import { 
   Image as VanImage, 
   Switch, 
@@ -126,93 +177,158 @@ import {
   showFailToast, 
   showSuccessToast, 
   Icon,
-  Lazyload 
+  Lazyload,
+  Search as VanSearch,
+  List as VanList,
+  PullRefresh as VanPullRefresh
 } from 'vant';
 import { 
   getUsersWithLikes, 
   updateUserActiveStatus, 
+  toggleUserTopStatus,
   type AdminUser 
 } from '@/api/admin'
+import type { RouteLocationNormalized } from 'vue-router';
 
 type LocalAdminUser = AdminUser & {
-  updating?: boolean
+  updating?: boolean;
+  topping?: boolean;
 }
-const activeTab = ref<'all' | 'male' | 'female'>('all')
-const users = ref<LocalAdminUser[]>([])
-const loading = ref(true);
+const router = useRouter();
+// 分页相关状态
+const list = ref<LocalAdminUser[]>([]); // 当前列表数据
+const loading = ref(false);             // 加载状态
+const finished = ref(false);            // 是否加载完成
+const refreshing = ref(false);          // 是否正在刷新
+const currentPage = ref(1);             // 当前页码
+const pageSize = ref(20);               // 每页数量
 
-// 计算列表高度（根据视口高度减去标题高度）
-const listHeight = computed(() => {
-  return window.innerHeight - 80; // 根据实际标题高度调整
-});
+const activeTab = ref<'all' | 'male' | 'female' | 'top'>('all')
+const searchKeyword = ref('');
+const offset = ref({ x: 0.05 * window.innerWidth, y: 0.03 * window.innerHeight });
 
+const goBack = () => {
+  const previousRoute = getPreviousRoute();
+  if (previousRoute) {
+    router.replace({ path: previousRoute.path, query: previousRoute.query, params: previousRoute.params });
+  } else {
+    router.replace('/userCenter');
+  }
+};
+
+
+// 格式化到期时间
+const formatExpireDate = (dateStr: string | null) => {
+  if (!dateStr) return '永久';
+  const date = new Date(dateStr);
+  return date.toISOString().split('T')[0]+'到期';
+};
 
 // 获取用户头像URL
 const getAvatarUrl = (avatar: string) => {
   return avatar ? `avatars/${avatar}` : '';
 };
 
-// 过滤用户
-const filteredUsers = computed(() => {
-  if (activeTab.value === 'all') return users.value;
-  return users.value.filter(u => u.gender === activeTab.value);
-});
+// 设置激活标签
+const setActiveTab = (tab: 'all' | 'male' | 'female' | 'top') => {
+  activeTab.value = tab;
+  onRefresh();
+}
 
-// 按点赞数排序
-const sortedUsers = computed(() => {
-  return [...filteredUsers.value].sort((a, b) => b.like_count - a.like_count);
-});
+// 搜索处理
+const onSearch = () => {
+  onRefresh();
+}
 
-// 虚拟列表
-const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
-  sortedUsers,
-  {
-    itemHeight: 140, // 固定卡片高度
-    overscan: 10
+// 下拉刷新
+const onRefresh = () => {
+  // 清空列表数据
+  list.value = [];
+  currentPage.value = 1;
+  finished.value = false;
+  
+  // 重新加载数据
+  loading.value = true;
+  onLoad();
+};
+
+// 加载更多数据
+const onLoad = async () => {
+  if (refreshing.value) {
+    refreshing.value = false;
   }
-);
+
+  try {
+    // 调用API获取数据
+    const data = await getUsersWithLikes({
+      gender: activeTab.value === 'all' ? undefined : 
+              activeTab.value === 'top' ? undefined : activeTab.value,
+      isTop: activeTab.value === 'top' ? true : undefined,
+      keyword: searchKeyword.value || undefined,
+      page: currentPage.value,
+      pageSize: pageSize.value
+    });
+
+    // 处理返回数据
+    const users = data.map(user => ({
+      ...user,
+      updating: false,
+      topping: false
+    }));
+
+    // 添加到列表
+    list.value = [...list.value, ...users];
+    
+    // 更新加载状态
+    loading.value = false;
+
+    // 检查是否已加载所有数据
+    if (users.length < pageSize.value) {
+      finished.value = true;
+    } else {
+      currentPage.value++;
+    }
+  } catch (error) {
+    console.error('加载用户数据失败:', error);
+    showFailToast('加载数据失败');
+    loading.value = false;
+    finished.value = true;
+  }
+};
 
 // 更新用户状态
-const updateUserStatus = async (user: LocalAdminUser) => {
+const updateUserStatus = async (user: LocalAdminUser, newState: boolean) => {
   try {
-    // 设置更新状态
-    const originalStatus = user.is_active;
     user.updating = true;
-    
-    // 调用API更新状态
-    await updateUserActiveStatus(user.id, user.is_active);
-    
-    showSuccessToast(`用户已${user.is_active ? '启用' : '冻结'}`);
+    await updateUserActiveStatus(user.id, newState);
+    user.state = newState ? 1 : 0;
+    showSuccessToast(`用户已${newState ? '启用' : '冻结'}`);
   } catch (error) {
     console.error('更新用户状态失败:', error);
     showFailToast('操作失败');
-    // 回退状态
-    user.is_active = !user.is_active;
   } finally {
     user.updating = false;
   }
 };
 
-// 加载用户数据
-const loadUsers = async () => {
+// 切换置顶状态
+const toggleTopStatus = async (user: LocalAdminUser, isTop: boolean) => {
   try {
-    loading.value = true;
-    const data = await getUsersWithLikes();
-    // 添加更新状态字段
-    users.value = data.map(user => ({
-      ...user,
-      updating: false
-    }));
+    user.topping = true;
+    await toggleUserTopStatus(user.id, isTop);
+    user.is_top = isTop;
+    showSuccessToast(isTop ? '已置顶' : '已取消置顶');
   } catch (error) {
-    console.error('加载用户数据失败:', error);
-    showFailToast('加载数据失败');
+    console.error('置顶操作失败:', error);
+    showFailToast('操作失败');
   } finally {
-    loading.value = false;
+    user.topping = false;
   }
 };
 
+// 初始化加载数据
 onMounted(() => {
-  loadUsers();
+  onLoad();
 });
 </script>
 
@@ -224,19 +340,23 @@ onMounted(() => {
   font-family: "Microsoft YaHei", sans-serif;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.header {
-  margin-bottom: 20px;
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: #F2EEE8;
   padding-bottom: 12px;
-  border-bottom: 1px solid #EBE3D7;
 }
 
-.title {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 16px;
+/* 优化搜索框样式 */
+.search-container {
+  margin-bottom: 12px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .filter-tabs {
@@ -282,7 +402,6 @@ onMounted(() => {
 .user-grid {
   flex: 1;
   position: relative;
-  overflow: auto;
 }
 
 .user-card {
@@ -364,20 +483,44 @@ onMounted(() => {
   border-top: 1px solid #f5f5f5;
 }
 
-.status-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
+.expire {
   font-size: 12px;
+  color: #888;
 }
 
-.status-badge.active {
-  background-color: rgba(215, 86, 112, 0.1);
-  color: #D75670;
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.status-badge.inactive {
-  background-color: rgba(107, 114, 128, 0.1);
-  color: #6B7280;
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.icon-wrapper .van-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.icon-wrapper .van-icon-success {
+  color: #fff;
+}
+
+.icon-wrapper .van-icon-cross {
+  color: #fff;
+}
+
+.icon-wrapper .van-icon-back-top {
+  color: #fff;
+}
+
+.icon-wrapper .van-icon-minus {
+  color: #fff;
 }
 
 .loading-container {

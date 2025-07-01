@@ -1,6 +1,5 @@
 import apiClient from '@/plugins/axios';
 
-// 使用唯一导出声明
 export interface AdminUser {
   id: number;
   nickname: string;
@@ -13,14 +12,20 @@ export interface AdminUser {
   expire_at: string;
 }
 
-// 内部使用的请求类型不需要导出
 interface UpdateStatusRequest {
   is_active: boolean;
 }
 
-export const getUsersWithLikes = async (gender?: 'male' | 'female'): Promise<AdminUser[]> => {
-  const params: Record<string, any> = {};
-  if (gender) params.gender = gender;
+// 添加分页和过滤参数
+export interface GetUsersParams {
+  gender?: 'male' | 'female';
+  isTop?: boolean;
+  keyword?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export const getUsersWithLikes = async (params?: GetUsersParams): Promise<AdminUser[]> => {
   const response = await apiClient.get('/api/admin/users', { params });
   return response.data || [];
 };
@@ -32,4 +37,8 @@ export const updateUserActiveStatus = (
   return apiClient.post(`/api/admin/users/${userId}/status`, {
     is_active: isActive
   });
+};
+
+export const toggleUserTopStatus = (userId: number, isTop: boolean): Promise<void> => {
+  return apiClient.post(`/api/admin/users/${userId}/toggle-top`, { is_top: isTop });
 };

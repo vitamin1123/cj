@@ -438,7 +438,7 @@ const goBack = () => {
   if (previousRoute) {
     router.replace({ path: previousRoute.path, query: previousRoute.query, params: previousRoute.params });
   } else {
-    router.replace('/home');
+    router.replace('/userCenter');
   }
 };
 

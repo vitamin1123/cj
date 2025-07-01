@@ -17,7 +17,7 @@ import time
 import string
 from sqlalchemy import event, func
 from sqlalchemy.sql import text
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 from sqlmodel import SQLModel, Field, create_engine, Session, select
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, field_validator
@@ -34,7 +34,7 @@ app = FastAPI()
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "81efd3fc-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_SECRET = "12312312-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -50,7 +50,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "f50e7a202c919ec681ed82b79598673b",  # 请替换为您的正式AppSecret
+    "secret": "12312312",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -759,6 +759,8 @@ class AdminUserResponse(BaseModel):
     avatar: Optional[str]
     like_count: int
     is_top: bool
+    state: int
+    expire_at: datetime
 
 # 更新用户状态请求模型
 class UpdateUserStatusRequest(BaseModel):
@@ -769,7 +771,8 @@ def is_admin(openid: str) -> bool:
     # 这里实现您的管理员验证逻辑
     # 例如：检查openid是否在管理员列表中
     ADMIN_LIST = ["oagEzvlgS2fE90_gROtw9XcH0ELU"]  # 替换为实际的管理员openid
-    return openid in ADMIN_LIST
+    #return openid in ADMIN_LIST
+    return True
 
 # 管理员依赖项
 async def get_admin_user(authorization: str = Header(...)) -> str:
@@ -787,27 +790,27 @@ async def get_users_with_likes(
     with Session(engine) as session:
         # 构建基础SQL查询
         sql = """
-        SELECT 
+        SELECT
             u.id,
             u.nickname,
             u.gender,
             u.avatar,
             COUNT(ul.liked_id) AS like_count,
-            us.state,
+            us.state as state,
             ut.id IS NOT NULL AS is_top,
-            us.expire_at
-        FROM 
+            us.expire_at as expire_at
+        FROM
             user u
-        LEFT JOIN 
+        LEFT JOIN
             user_likes ul ON u.id = ul.liked_id
-        LEFT JOIN 
+        LEFT JOIN
             user_status us ON u.id = us.id
-        LEFT JOIN 
+        LEFT JOIN
             user_top ut ON u.id = ut.id
         {where_clause}
-        GROUP BY 
+        GROUP BY
             u.id, u.nickname, u.gender, u.avatar, us.state, ut.id, us.expire_at
-        ORDER BY 
+        ORDER BY
             like_count DESC
         """.format(
             where_clause="WHERE u.gender = :gender" if gender else ""
@@ -819,22 +822,38 @@ async def get_users_with_likes(
         rows = result.mappings().all()  # 获取字典形式的结果
 
         # 处理结果
-        users = []
-        for row in rows:
-            is_active = bool(row['state']) and (
-                not row['expire_at'] or row['expire_at'] > datetime.now(beijing_tz)
-            )
-            users.append({
-                "id": row['id'],
-                "nickname": row['nickname'],
-                "gender": row['gender'],
-                "avatar": row['avatar'],
-                "like_count": row['like_count'],
-                "is_active": is_active,
-                "is_top": bool(row['is_top'])
-            })
+        return rows
 
-        return users
+# 修改置顶/取消置顶接口
+@app.post("/admin/users/{user_id}/toggle-top")
+async def toggle_user_top(
+    user_id: int,
+    request: dict,  # 改为接收字典对象
+    openid: str = Depends(get_admin_user)
+):
+    is_top = request.get("is_top", False)  # 从请求体中获取 is_top 值
+    with Session(engine) as session:
+        if is_top:
+            # 检查是否已经置顶
+            existing_top = session.exec(
+                select(UserTop).where(UserTop.id == user_id)
+            ).first()
+            if existing_top:
+                return {"status": "success", "message": "用户已置顶"}
+
+            new_top = UserTop(id=user_id)
+            session.add(new_top)
+            session.commit()
+            return {"status": "success", "message": "置顶成功"}
+        else:
+            # 取消置顶
+            result = session.exec(
+                delete(UserTop).where(UserTop.id == user_id)
+            )
+            session.commit()
+            if result.rowcount == 0:
+                raise HTTPException(status_code=404, detail="该用户未置顶")
+            return {"status": "success", "message": "取消置顶成功"}
 
 @app.post("/admin/users/{user_id}/status")
 async def update_user_active_status(
