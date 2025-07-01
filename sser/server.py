@@ -15,6 +15,7 @@ import asyncio
 import random
 import time
 import string
+import json
 from sqlalchemy import event, func
 from sqlalchemy.sql import text
 from sqlalchemy import delete, update
@@ -22,6 +23,7 @@ from sqlmodel import SQLModel, Field, create_engine, Session, select
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, field_validator
 from typing import Optional
+from contextlib import asynccontextmanager
 
 UPLOAD_DIR = "./public/avatar/"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -30,11 +32,51 @@ UPLOAD_PHOTO_DIR = "./img/photo/"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 beijing_tz = timezone(timedelta(hours=8))
-app = FastAPI()
+# 在 FastAPI 实例化前定义 lifespan 处理器
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 应用启动时执行数据库初始化
+    with Session(engine) as session:
+        try:
+            # 创建 user_visits 表（如果不存在）
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS user_visits (
+                target_id INT NOT NULL,
+                visitor_id INT NOT NULL,
+                created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX idx_target_created (target_id, created_at),
+                INDEX idx_visitor_created (visitor_id, created_at),
+                INDEX idx_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+            session.execute(text(create_table_sql))
+            session.commit()
+
+            # 设置自动清理事件（1个月）
+            session.execute(text("""
+                CREATE EVENT IF NOT EXISTS clean_old_visits
+                ON SCHEDULE EVERY 1 HOUR
+                DO
+                    DELETE FROM user_visits
+                    WHERE created_at < NOW() - INTERVAL 1 MONTH;
+            """))
+            session.execute(text("SET GLOBAL event_scheduler = ON;"))
+            session.commit()
+        except Exception as e:
+            print(f"数据库初始化失败: {str(e)}")
+            # 如果事件创建失败，使用后台任务作为备选
+            setup_background_cleaner()
+
+    yield  # 应用运行中
+
+    # 应用关闭时可在此添加清理逻辑（可选）
+    # pass
+#app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "12312312-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_SECRET = "123123123-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -50,7 +92,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "12312312",  # 请替换为您的正式AppSecret
+    "secret": "123123123123123",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -493,7 +535,7 @@ class LikeRequest(BaseModel):
     liked_id: int
     action: str  # "like" or "unlike"
 
-# 极致优化的点赞处理路由
+#
 @app.post("/like")
 async def handle_like(
     like_request: LikeRequest,
@@ -584,6 +626,23 @@ async def get_likes(
             "ilike": ilike,
             "likeme": likeme
         }
+
+# 异步记录访问的函数
+async def record_visit(target_id: int, visitor_id: int):
+    try:
+        with Session(engine) as session:
+            # 使用原生SQL提高性能
+            session.execute(
+                text("""
+                    INSERT INTO cj.user_visits (target_id, visitor_id)
+                    VALUES (:target_id, :visitor_id)
+                """),
+                {"target_id": target_id, "visitor_id": visitor_id}
+            )
+            session.commit()
+    except Exception as e:
+        print(f"访问记录插入失败: {str(e)}")
+
 
 # 新增保存资料接口
 @app.post("/profile")
@@ -781,15 +840,21 @@ async def get_admin_user(authorization: str = Header(...)) -> str:
         raise HTTPException(status_code=403, detail="无管理权限")
     return openid
 
-# 获取用户列表（带点赞数和状态）
 @app.get("/admin/users", response_model=list[AdminUserResponse])
 async def get_users_with_likes(
     openid: str = Depends(get_admin_user),
-    gender: Optional[str] = None
+    gender: Optional[str] = None,
+    is_top: Optional[bool] = None,
+    keyword: Optional[str] = None,
+    page: int = 1,
+    pageSize: int = 20
 ):
+    # 计算偏移量
+    offset = (page - 1) * pageSize
+
     with Session(engine) as session:
         # 构建基础SQL查询
-        sql = """
+        base_sql = """
         SELECT
             u.id,
             u.nickname,
@@ -807,19 +872,50 @@ async def get_users_with_likes(
             user_status us ON u.id = us.id
         LEFT JOIN
             user_top ut ON u.id = ut.id
+        """
+
+        # 构建WHERE条件
+        conditions = []
+        params = {}
+
+        if gender:
+            conditions.append("u.gender = :gender")
+            params["gender"] = gender
+
+        if is_top is not None:
+            if is_top:
+                conditions.append("ut.id IS NOT NULL")
+            else:
+                conditions.append("ut.id IS NULL")
+
+        if keyword:
+            conditions.append("(u.nickname LIKE :keyword OR u.id LIKE :keyword)")
+            params["keyword"] = f"%{keyword}%"
+
+        # 组合WHERE子句
+        where_clause = ""
+        if conditions:
+            where_clause = "WHERE " + " AND ".join(conditions)
+
+        # 构建完整SQL
+        sql = f"""
+        {base_sql}
         {where_clause}
         GROUP BY
             u.id, u.nickname, u.gender, u.avatar, us.state, ut.id, us.expire_at
         ORDER BY
+            is_top DESC,
             like_count DESC
-        """.format(
-            where_clause="WHERE u.gender = :gender" if gender else ""
-        )
+        LIMIT :limit OFFSET :offset
+        """
+
+        # 添加分页参数
+        params["limit"] = pageSize
+        params["offset"] = offset
 
         # 执行查询
-        params = {"gender": gender} if gender else {}
         result = session.execute(text(sql), params)
-        rows = result.mappings().all()  # 获取字典形式的结果
+        rows = result.mappings().all()
 
         # 处理结果
         return rows
@@ -889,6 +985,8 @@ async def get_user_by_id(
                 raise HTTPException(status_code=404, detail="当前用户未找到")
 
             current_user_id = current_user_id_result[0]
+            loop = asyncio.get_event_loop()
+            loop.create_task(record_visit(user_id, current_user_id))
 
             # 查询目标用户信息
             target_user = session.exec(
@@ -935,8 +1033,75 @@ async def get_user_by_id(
             print(f"获取用户详情出错: {str(e)}")
             raise HTTPException(status_code=500, detail="服务器内部错误")
 
+
+def setup_background_cleaner():
+    """设置后台清理任务（备选方案）"""
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    def clean_old_visits():
+        with Session(engine) as session:
+            try:
+                one_month_ago = datetime.now() - timedelta(days=30)
+                session.execute(
+                    text("DELETE FROM user_visits WHERE created_at < :cutoff"),
+                    {"cutoff": one_month_ago}
+                )
+                session.commit()
+            except Exception as e:
+                print(f"自动清理失败: {str(e)}")
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(clean_old_visits, 'interval', hours=1)
+    scheduler.start()
+
 @app.get("/explore_people")
 async def explore_people():
+    with Session(engine) as session:
+        try:
+            stmt = text("""
+                SELECT
+                    IFNULL(
+                        (SELECT JSON_OBJECTAGG(
+                            CAST(id AS CHAR),  
+                            JSON_OBJECT(
+                                'gender', gender,
+                                'birth_date', DATE_FORMAT(birth_date, '%Y-%m-%dT%H:%i:%s'),
+                                'height', height,
+                                'avatar', avatar,
+                                'education', education,
+                                'id', id,
+                                'income_level', income_level,
+                                'mem', mem,
+                                'nickname', nickname,
+                                'occupation', occupation,
+                                'photo', first_photo,
+                                'region_code', region_code,
+                                'weight', weight
+                            )
+                        ) FROM user),
+                        JSON_OBJECT()
+                    ) as people_json,  -- 返回对象而非数组
+                    MAX(updated_at) as lasttime
+                FROM user
+            """)
+
+            result = session.execute(stmt).fetchone()
+            people_dict = result[0] if result else {}
+            
+            return {
+                "people": json.dumps(people_dict),  # 直接返回对象
+                "lasttime": result[1].isoformat() if result and result[1] else None
+            }
+
+        except Exception as e:
+            print(f"Database error: {str(e)}")
+            return {
+                "people": "{}",
+                "lasttime": None
+            }
+
+@app.get("/explore_people_bak_1")
+async def explore_people_bak_1():
     with Session(engine) as session:
         try:
             # MySQL兼容的JSON查询
@@ -1019,8 +1184,8 @@ async def explore_people_old():
 
     return {"people": people_list}
 
-@app.get('/explore_people_updated')
-async def get_updated_people(since: str):
+@app.get('/explore_people_updated_bak')
+async def get_updated_people_bak(since: str):
     with Session(engine) as session:
         stmt = select(User).where(User.updated_at > since)
         results = session.exec(stmt).all()
@@ -1028,6 +1193,34 @@ async def get_updated_people(since: str):
             'people': [dict(u) for u in results],
             'lasttime': max(u.updated_at for u in results)
         }
+
+@app.get("/interested")
+async def get_interested_users():
+    try:
+        # 创建子查询：获取所有置顶用户的ID
+        subquery = select(UserTop.id).scalar_subquery()
+
+        # 使用子查询直接查询User表
+        stmt = select(User).where(User.id.in_(subquery))
+
+        # 执行查询
+        with Session(engine) as session:
+            interested_users = session.scalars(stmt).all()
+
+        # 格式化返回数据
+        users_list = [
+            user.model_dump(exclude={"openid", "phone", "mem_pri", "photo"})
+            for user in interested_users
+        ]
+
+        return users_list
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取感兴趣用户失败: {str(e)}"
+        )
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)

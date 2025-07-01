@@ -732,6 +732,7 @@ const loadUserProfiles = async () => {
     }));
     
     filteredPeopleList.value = [...allPeopleList.value];
+    console.log('filteredPeopleList.value: ',filteredPeopleList.value[0])
     return true
   } catch (error) {
     console.error('加载用户数据失败:', error);

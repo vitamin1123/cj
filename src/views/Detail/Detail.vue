@@ -2,7 +2,11 @@
   <div class="detail-container">
     <div class="header">
       <van-icon name="arrow-left" class="back-icon" @click="goBack" />
-      <span class="header-title">编号{{ userInfo.id }}</span>
+      <span class="header-title">编号{{ userInfo.id }}
+        <!-- 新增性别图标 -->
+        <span v-if="userInfo.gender === 'male'" class="gender-icon male">♂</span>
+        <span v-else-if="userInfo.gender === 'female'" class="gender-icon female">♀</span>
+      </span>
       <div class="header-right">
         <van-icon name="like" class="heart-icon" :class="{ liked: isLocalLiked }" @click="toggleLike" />
       </div>
@@ -458,7 +462,20 @@ onMounted(() => {
 .dimension:nth-child(2) .option.active { color: #4A9FF5; }
 .dimension:nth-child(3) .option.active { color: #FF6B6B; }
 .dimension:nth-child(4) .option.active { color: #9B59B6; }
+/* 新增性别图标样式 */
+.gender-icon {
+  margin-left: 6px;
+  font-weight: bold;
+  font-size: 1.1em;
+}
 
+.male {
+  color: #2c7be5; /* 男性蓝色 */
+}
+
+.female {
+  color: #e83e8c; /* 女性粉色 */
+}
 
 /* === 照片边缘透明效果 === */
 .lift-up {

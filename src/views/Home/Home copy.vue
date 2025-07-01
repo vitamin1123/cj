@@ -1,19 +1,55 @@
 <template>
   <div class="home-container">
-    <!-- 骨架屏 -->
+    <!-- 骨架屏 - 完全使用 Vant4 Skeleton 重构 -->
     <div v-if="isLoading" class="skeleton-container">
-      <div class="skeleton-search"></div>
-      <div class="skeleton-news"></div>
+      <!-- 搜索框骨架 -->
+      <van-skeleton 
+        :row="1" 
+        :row-width="['100%']" 
+        :row-height="48"
+        class="skeleton-search"
+      />
+      
+      <!-- 新闻卡片骨架 -->
+      <van-skeleton 
+        :row="0"
+        class="skeleton-news"
+        style="height: 150px; border-radius: 8px;"
+      />
+      
+      <!-- 新人展示骨架 -->
       <div class="skeleton-section">
-        <div class="skeleton-title"></div>
+        <van-skeleton 
+          title 
+          title-width="120px" 
+          :row="0"
+          class="skeleton-title"
+        />
         <div class="skeleton-cards">
-          <div v-for="i in 3" :key="i" class="skeleton-card"></div>
+          <van-skeleton 
+            class="skeleton-card"
+            avatar
+            avatar-size="48px"
+            avatar-shape="round"
+            :row="2"
+            :row-width="['70%', '50%']"
+          />
         </div>
       </div>
+      
+      <!-- 推荐板块骨架 -->
       <div class="skeleton-section">
-        <div class="skeleton-title"></div>
+        <van-skeleton 
+          title 
+          title-width="120px" 
+          :row="0"
+          class="skeleton-title"
+        />
         <div class="skeleton-cards">
-          <div v-for="i in 2" :key="i" class="skeleton-recommend-card"></div>
+          <van-skeleton 
+            class="skeleton-recommend-card"
+            style="height: 366px; width: 224px;"
+          />
         </div>
       </div>
     </div>
@@ -28,7 +64,7 @@
 
     <!-- 页面内容 -->
     <div v-else class="page-content" @click="handlePageClick">
-      <!-- 搜索框 - 主要修改区域 -->
+      <!-- 搜索框 -->
       <div class="search-container" @click.stop>
         <div class="search-card" :class="{ focused: isSearchFocused }">
           <div class="search-box">
@@ -37,11 +73,13 @@
               type="text" 
               placeholder="搜索" 
               class="search-input" 
+              v-model="searchKeyword"
               @focus="handleSearchFocus"
+              @keyup.enter="handleSearch"
             />
           </div>
           
-          <div class="search-options" v-if="isSearchFocused">
+          <!-- <div class="search-options" v-if="isSearchFocused">
             <div class="search-option-item">
               <div class="option-label">身高</div>
               <div class="option-input">
@@ -56,7 +94,7 @@
                 <van-icon name="clear" class="clear-icon" />
               </div>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
 
@@ -70,57 +108,46 @@
 
       <!-- 新人展示 -->
       <div class="newcomer-section">
-        <!-- <h2 class="section-title">天顺新面孔</h2>
-        <van-swipe class="newcomer-swipe" :loop="true" :width="180" :height="80" :autoplay="5000" indicator-color="transparent">
-          <van-swipe-item v-for="i in 4" :key="i">
-            <div class="newcomer-card">
-              <div class="avatar"></div>
+        <h2 class="section-title">天顺新面孔</h2>
+        <div v-if="isNewcomersLoading" class="newcomer-skeleton">
+          <van-skeleton 
+            v-for="i in 1" 
+            :key="'skeleton'+i" 
+            class="skeleton-card" 
+            :row="2" 
+            :row-width="['60%', '40%']" 
+            avatar
+            avatar-size="48px"
+            avatar-shape="round"
+            title
+            title-width="40%"
+          />
+        </div>
+        <van-swipe 
+          v-else
+          class="newcomer-swipe" 
+          :loop="true" 
+          :width="180" 
+          :height="80" 
+          :autoplay="5000" 
+          indicator-color="transparent"
+        >
+          <van-swipe-item v-for="(user, index) in newcomers" :key="index">
+            <div class="newcomer-card" @click="goToDetail(user.id)">
+              <div class="avatar">
+                <img 
+                  :src="user.avatarUrl" 
+                  alt="头像"
+                  style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;"
+                />
+              </div>
               <div class="info">
-                <div class="title">标题</div>
-                <div class="subtitle">副标题</div>
+                <div class="title">{{ user.displayTitle }}</div>
+                <div class="subtitle">{{ user.displaySubtitle }}</div>
               </div>
             </div>
           </van-swipe-item>
-        </van-swipe> -->
-          <h2 class="section-title">天顺新面孔</h2>
-          <div v-if="isNewcomersLoading" class="newcomer-skeleton">
-            <van-skeleton 
-              v-for="i in 3" 
-              :key="'skeleton'+i" 
-              class="skeleton-card" 
-              :row="2" 
-              :row-width="['60%', '40%']" 
-              avatar
-              avatar-size="48px"
-              avatar-shape="round"
-              title
-              title-width="40%"
-            />
-          </div>
-            <van-swipe 
-              class="newcomer-swipe" 
-              :loop="true" 
-              :width="180" 
-              :height="80" 
-              :autoplay="5000" 
-              indicator-color="transparent"
-            >
-             <van-swipe-item v-for="(user, index) in newcomers" :key="index">
-      <div class="newcomer-card" @click="goToDetail(user.id)">
-        <div class="avatar">
-          <img 
-            :src="user.avatarUrl" 
-            alt="头像"
-            style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;"
-          />
-        </div>
-        <div class="info">
-          <div class="title">{{ user.displayTitle }}</div>
-          <div class="subtitle">{{ user.displaySubtitle }}</div>
-        </div>
-      </div>
-    </van-swipe-item>
-  </van-swipe>
+        </van-swipe>
       </div>
 
       <!-- 推荐板块 -->
@@ -156,7 +183,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted , computed} from 'vue';
+import { useExploreStore } from '@/store/exploreStore';
 import TabBar from '@/components/TabBar.vue';
 import { Skeleton } from 'vant';
 import { useRouter } from 'vue-router';
@@ -175,6 +203,7 @@ import likeSelectedIcon from '@/assets/icons/like-selected.svg';
 import smileIcon from '@/assets/icons/smile.svg';
 import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 
+const exploreStore = useExploreStore();
 const userStore = useUserInfoStore()
 const userListStore = useUserListStore()
 const activeTab = ref('home');
@@ -186,6 +215,11 @@ const authStore = useAuthStore();
 const likeStore = useLikeStore();
 const newcomers = ref<any[]>([]);
 const isNewcomersLoading = ref(true); 
+
+const searchKeyword = computed({
+  get: () => exploreStore.state.searchKeyword,
+  set: (value) => exploreStore.state.searchKeyword = value
+});
 
 const checkAuth = async () => {
   isLoading.value = true;
@@ -221,18 +255,40 @@ const fetchNewcomers = async () => {
   }
 };
 
-
+const fetchInter = async()=> {
+  try {
+    const response = await apiClient.get('/api/interested');
+    
+  } catch (error) {
+    console.error('获取感兴趣数据失败:', error);
+  }finally {
+     // 结束加载
+  }
+}
 
 const retryAuth = () => {
   checkAuth();
 };
 
+const handleSearch = () => {
+  // 保存状态到本地存储
+  exploreStore.saveState();
+  
+  // 跳转到探索页面
+  router.replace('/explore');
+  
+  // 关闭搜索框
+  closeSearch();
+};
+
 onMounted(async() => {
+  exploreStore.loadState();
   await checkAuth();
   await userListStore.initializeStore();
   await userStore.fetchUserProfile();
   await likeStore.fetchLikes()
   await fetchNewcomers();
+  await fetchInter()
 });
 
 const handleSearchFocus = () => {
@@ -303,28 +359,25 @@ const goToDetail = (id: number) => {
   position: relative;
 }
 
-/* 骨架屏样式 */
+/* 骨架屏样式 - 更新为Vant Skeleton */
 .skeleton-container {
   flex: 1;
   margin-bottom: 60px;
+  padding: 0 8px;
 }
 
 .skeleton-search {
   height: 48px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
   border-radius: 24px;
   margin-bottom: 16px;
+  overflow: hidden;
 }
 
 .skeleton-news {
   height: 150px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
   border-radius: 8px;
   margin-bottom: 24px;
+  overflow: hidden;
 }
 
 .skeleton-section {
@@ -332,48 +385,27 @@ const goToDetail = (id: number) => {
 }
 
 .skeleton-title {
-  height: 20px;
-  width: 120px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-  border-radius: 4px;
   margin-bottom: 16px;
+  overflow: hidden;
 }
 
 .skeleton-cards {
   display: flex;
   gap: 8px;
-  overflow-x: hidden;
 }
 
 .skeleton-card {
   width: 172px;
   height: 80px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
   border-radius: 8px;
-  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .skeleton-recommend-card {
   width: 224px;
   height: 366px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
   border-radius: 8px;
-  flex-shrink: 0;
-}
-
-@keyframes loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+  overflow: hidden;
 }
 
 /* 错误容器样式 */
@@ -434,7 +466,7 @@ const goToDetail = (id: number) => {
   min-height: calc(100vh - 92px);
 }
 
-/* 搜索容器 - 重点修改区域 */
+/* 搜索容器 */
 .search-container {
   margin-bottom: 16px;
   position: relative;
@@ -446,14 +478,12 @@ const goToDetail = (id: number) => {
   background-color: #EBE3D7;
   border-radius: 50px;
   padding: 12px 16px;
-  /* 优化过渡效果：更慢更柔和 */
   transition: all 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
   position: relative;
   z-index: 10;
   width: 100%;
   box-sizing: border-box;
   overflow: hidden;
-  /* 解决iOS边框问题 */
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
@@ -462,10 +492,8 @@ const goToDetail = (id: number) => {
 .search-card.focused {
   border-radius: 12px;
   padding-bottom: 16px;
-  /* 移除fixed定位，改为相对布局 */
   position: relative;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  /* 添加最大高度限制防止过大 */
   max-height: 300px;
 }
 
@@ -482,13 +510,11 @@ const goToDetail = (id: number) => {
   width: 100%;
   font-family: "Microsoft YaHei", sans-serif;
   font-size: 14px;
-  /* 添加过渡效果 */
   transition: all 0.3s ease;
 }
 
 .search-options {
   margin-top: 12px;
-  /* 优化动画效果 */
   animation: slideDown 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
   opacity: 0;
   transform-origin: top;
@@ -509,7 +535,6 @@ const goToDetail = (id: number) => {
   display: flex;
   align-items: center;
   margin-bottom: 12px;
-  /* 添加过渡效果 */
   transition: all 0.3s ease;
 }
 
@@ -517,7 +542,6 @@ const goToDetail = (id: number) => {
   width: 60px;
   font-size: 14px;
   color: #6A6A6A;
-  /* 添加过渡效果 */
   transition: all 0.3s ease;
 }
 
@@ -536,7 +560,6 @@ const goToDetail = (id: number) => {
   padding: 8px 32px 8px 12px;
   font-size: 14px;
   outline: none;
-  /* 添加过渡效果 */
   transition: all 0.3s ease;
 }
 
@@ -545,7 +568,6 @@ const goToDetail = (id: number) => {
   right: 8px;
   color: #ccc;
   font-size: 16px;
-  /* 添加过渡效果 */
   transition: all 0.3s ease;
 }
 
@@ -695,17 +717,6 @@ const goToDetail = (id: number) => {
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
-}
-
-.skeleton-card {
-  width: 172px;
-  height: 80px;
-  background: white;
-  border-radius: 8px;
-  padding: 8px;
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border: 1px solid #ebedf0;
 }
 
 /* 调整 Vant 骨架屏内部样式 */
