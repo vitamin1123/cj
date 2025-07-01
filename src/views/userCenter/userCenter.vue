@@ -36,7 +36,7 @@
                 <div class="stat-label">喜欢我的</div>
               </div>
               <div class="stat-item">
-                <div class="stat-number">{{ "90" }}</div>
+                <div class="stat-number">{{ recentVisitorsCount  }}</div>
                 <div class="stat-label">最近来访</div>
               </div>
             </div>
@@ -155,6 +155,7 @@ const tempNickname = ref('');
 const showPhotoPopup = ref(false);
 const fileList = ref<any[]>([]);
 const userPhotos = ref<string[]>([]);
+const recentVisitorsCount = ref(0);
 
 // 从store中获取用户信息
 const user = computed(() => {
@@ -200,8 +201,19 @@ const likes = computed(() => {
   };
 });
 
-onMounted(() => {
+const fetchVisitCount = async () => {
+  try {
+    const response = await apiClient.post('/api/visit-count',{});
+    recentVisitorsCount.value = response.data.count;
+  } catch (error) {
+    console.error('获取最近来访数量失败', error);
+    showToast('获取数据失败');
+  }
+};
+
+onMounted(async() => {
   // fetchUserProfile();
+  await fetchVisitCount();
 });
 
 // 编辑头像

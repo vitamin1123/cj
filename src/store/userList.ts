@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watchEffect } from 'vue'
+import { ref, computed, watchEffect, toRaw  } from 'vue'
 import apiClient from '@/plugins/axios'
 import localforage from 'localforage'
 
@@ -25,17 +25,17 @@ interface User {
   photo: string
   region_code: string
   weight: number
-  updated_at?:string
+  updated_at?: string
 }
 
 interface UserListResponse {
-  people: string
+  people: Record<string, User>  // 后端返回的是字符串化的对象
   lasttime: string
 }
 
 interface StoredUserListData {
-  people: User[]
-  lasttime: string | null
+  usersById: Record<number, User>;
+  lasttime: string | null;
 }
 
 // 自定义存储适配器类型
@@ -48,10 +48,8 @@ interface CustomPersistStorage {
 // 创建自定义持久化存储
 const createPersistStorage = () => ({
   getItem: (key: string): string | null => {
-    // 注意：这里使用了同步的localforage.getItemSync（需要localforage 1.10+）
-    // 或者使用同步的localStorage作为fallback
     try {
-      const data = localStorage.getItem(key); // 同步读取
+      const data = localStorage.getItem(key);
       return data || null;
     } catch (err) {
       console.error('Failed to read from localStorage:', err);
@@ -59,174 +57,214 @@ const createPersistStorage = () => ({
     }
   },
   setItem: (key: string, value: string): void => {
-    localStorage.setItem(key, value); // 同步写入
+    localStorage.setItem(key, value);
   },
   removeItem: (key: string): void => {
-    localStorage.removeItem(key); // 同步删除
+    localStorage.removeItem(key);
   }
 });
 
 export const useUserListStore = defineStore(
   'userList',
   () => {
-    // State
-    const people = ref<User[]>([])
-    const lasttime = ref<string | null>(null)
-    const isLoading = ref(false)
-    const error = ref<string | null>(null)
+    // 使用对象存储
+    const usersById = ref<Record<number, User>>({});
+    const lasttime = ref<string | null>(null);
+    const isLoading = ref(false);
+    const error = ref<string | null>(null);
 
+    // 计算属性：获取用户数组
+    const peopleArray = computed(() => Object.values(usersById.value));
+    
     // Actions
     const checkLasttimeAndUpdate = async (): Promise<void> => {
       try {
         const response = await apiClient.get('/api/getlasttime')
         const serverLasttime = response.data.lasttime as string
         
-        // 判断是否是首次加载（本地没有lasttime或没有用户数据）
-        const isFirstLoad = !lasttime.value || people.value.length === 0
+        // 改进首次加载判断逻辑
+        const hasLocalData = Object.keys(usersById.value).length > 0
+        const hasLastTime = !!lasttime.value
         
-        // 如果有本地数据且服务器时间更新
-        if (!isFirstLoad && serverLasttime && lasttime.value && serverLasttime > lasttime.value) {
-          await fetchIncrementalUserList(lasttime.value) // 这里确保 lasttime.value 不为 null
-        }
-        // 如果是首次加载
-        else if (isFirstLoad) {
+        // 首次加载：无本地数据或没有lasttime
+        if (!hasLocalData || !hasLastTime) {
           await fetchUserList()
+          return
+        }
+        
+        // 服务器有更新时获取增量数据
+        if (serverLasttime && lasttime.value && serverLasttime > lasttime.value) {
+          await fetchIncrementalUserList(lasttime.value)
         }
       } catch (err) {
         error.value = '检查更新时间失败'
         console.error('Failed to check lasttime:', err)
-      }
-    }
-
-
-    const fetchUserList = async (): Promise<void> => {
-      isLoading.value = true
-      error.value = null
-      try {
-        const response = await apiClient.get<UserListResponse>('/api/explore_people')
-        if (response.status === 200 && response.data) {
-          const parsedPeople = JSON.parse(response.data.people) as User[]
-          people.value = parsedPeople
-          lasttime.value = response.data.lasttime
-        }
-      } catch (err) {
-        error.value = '获取用户列表失败'
-        console.error('Failed to fetch user list:', err)
-      } finally {
-        isLoading.value = false
-      }
-    }
-// 获取增量数据
-const fetchIncrementalUserList = async (since: string): Promise<void> => {
-      isLoading.value = true
-      error.value = null
-      try {
-        const response = await apiClient.get<{ 
-          people: User[]; 
-          lasttime: string 
-        }>(`/api/explore_people_updated?since=${since}`)
-        
-        if (response.status === 200 && response.data) {
-          const newPeople = response.data.people
-          
-          // 如果没有新数据，直接返回
-          if (newPeople.length === 0) {
-            console.log('没有新的用户数据')
-            return
-          }
-          
-          // 创建现有用户的ID映射
-          const existingPeopleMap = new Map<number, User>()
-          people.value.forEach(user => existingPeopleMap.set(user.id, user))
-          
-          // 合并新数据
-          newPeople.forEach(newUser => {
-            existingPeopleMap.set(newUser.id, newUser)
-          })
-          
-          // 更新状态
-          people.value = Array.from(existingPeopleMap.values())
-          lasttime.value = response.data.lasttime
-          
-          console.log(`成功合并 ${newPeople.length} 条增量用户数据`)
-        }
-      } catch (err) {
-        error.value = '获取增量用户列表失败'
-        console.error('Failed to fetch incremental user list:', err)
-        
-        // 如果增量更新失败，回退到全量更新
+        // 回退到全量更新
         await fetchUserList()
-      } finally {
-        isLoading.value = false
       }
     }
-    
 
+    // 优化后的fetchUserList - 直接处理对象格式
+    const fetchUserList = async (): Promise<void> => {
+      isLoading.value = true;
+      error.value = null;
+      try {
+        const response = await apiClient.get<UserListResponse>('/api/explore_people_dic');
+        if (response.status === 200 && response.data) {
+          // 直接处理API返回的对象格式
+          const rawData = response.data.people;
+          
+          // 转换键为数字类型
+          const processedDict: Record<number, User> = {};
+          
+          Object.entries(rawData).forEach(([key, user]) => {
+            const userId = parseInt(key, 10);
+            if (!isNaN(userId)) {
+              processedDict[userId] = user;
+            } else {
+              console.warn(`Invalid user ID: ${key}`);
+            }
+          });
+
+          usersById.value = processedDict;
+          lasttime.value = response.data.lasttime;
+          console.log(`成功加载 ${Object.keys(processedDict).length} 条用户数据`);
+        }
+      } catch (err) {
+        error.value = '获取用户列表失败';
+        console.error('Failed to fetch user list:', err);
+        
+        // 更详细的错误日志
+        if (err instanceof SyntaxError) {
+          console.error('JSON解析错误，原始数据:', err);
+        }
+      } finally {
+        isLoading.value = false;
+      }
+    };
+
+    // 优化增量数据获取
+    const fetchIncrementalUserList = async (since: string): Promise<void> => {
+      isLoading.value = true;
+      error.value = null;
+      try {
+        const response = await apiClient.get<UserListResponse>(
+          `/api/explore_people_updated_dic?since=${since}`
+        );
+        
+        if (response.status === 200 && response.data) {
+          const rawData = response.data.people;
+          
+          // 处理增量数据
+          Object.entries(rawData).forEach(([key, user]) => {
+            const userId = parseInt(key, 10);
+            if (!isNaN(userId)) {
+              // 合并/更新现有用户数据
+              usersById.value[userId] = user;
+            }
+          });
+          
+          lasttime.value = response.data.lasttime;
+          console.log(`成功更新 ${Object.keys(rawData).length} 条用户数据`);
+        }
+      } catch (err) {
+        error.value = '获取增量用户列表失败';
+        console.error('Failed to fetch incremental user list:', err);
+      } finally {
+        isLoading.value = false;
+      }
+    };
+    
+    // 初始化方法
     const initializeStore = async (): Promise<void> => {
       try {
-        const storedData = await userListStorage.getItem<StoredUserListData>('userListData')
-        if (storedData) {
-          people.value = storedData.people || []
-          lasttime.value = storedData.lasttime || null
-        }
+        const storedData = await userListStorage.getItem<StoredUserListData>('userListData');
         
-        // 无论是否有存储数据，都检查更新
-        await checkLasttimeAndUpdate()
+        if (storedData) {
+          // 直接使用存储的数据
+          usersById.value = storedData.usersById;
+          lasttime.value = storedData.lasttime;
+          console.log(`从存储加载 ${Object.keys(storedData.usersById).length} 条用户数据`);
+        }
       } catch (err) {
-        console.error('Failed to initialize store:', err)
-        // 初始化失败时尝试获取全量数据
-        await fetchUserList()
+        console.error('初始化存储失败:', err);
+        // 清除问题数据
+        await userListStorage.removeItem('userListData');
       }
+      
+      // 无论是否有本地数据都检查更新
+      await checkLasttimeAndUpdate();
     }
 
     const saveToStorage = async (): Promise<void> => {
       try {
-        // 修改保存数据的部分
+        // 使用 toRaw 获取非响应式原始数据
+        const rawUsersById = toRaw(usersById.value);
+        const rawLasttime = lasttime.value; // 基本类型不需要转换
+        
         const dataToStore: StoredUserListData = {
-          people: JSON.parse(JSON.stringify(people.value)), // 深度克隆
-          lasttime: lasttime.value
-        }
-        await userListStorage.setItem('userListData', dataToStore)
+          usersById: rawUsersById,
+          lasttime: rawLasttime
+        };
+        
+        await userListStorage.setItem('userListData', dataToStore);
       } catch (err) {
-        console.error('Failed to save data:', err)
+        console.error('保存数据失败:', err);
         if ((err as Error).name === 'QuotaExceededError') {
-          console.warn('存储空间不足，尝试清理旧数据...')
+          console.warn('存储空间不足，尝试清理旧数据...');
+          // 清理策略：保留最近的100个用户
+          const allIds = Object.keys(usersById.value);
+          if (allIds.length > 100) {
+            const idsToRemove = allIds
+              .slice(0, allIds.length - 100)
+              .map(id => parseInt(id, 10));
+            
+            idsToRemove.forEach(id => {
+              delete usersById.value[id];
+            });
+            
+            console.log(`清理了 ${idsToRemove.length} 条旧数据`);
+            // 重试保存
+            await saveToStorage();
+          }
         }
       }
     }
 
     // Computed
     const formattedPeople = computed(() => {
-      return people.value.map(person => ({
+      return peopleArray.value.map(person => ({
         ...person,
         formattedBirthDate: person.birth_date 
           ? new Date(person.birth_date).toLocaleDateString() 
           : '未知'
-      }))
-    })
+      }));
+    });
 
     // Auto-save when data changes
     watchEffect(() => {
-      if (people.value.length > 0 || lasttime.value) {
-        saveToStorage()
+      const hasUsers = Object.keys(usersById.value).length > 0;
+      
+      if (hasUsers || lasttime.value) {
+        saveToStorage();
       }
     })
 
-    
-
     return {
       // State
-      people,
+      usersById,
       lasttime,
       isLoading,
       error,
       
       // Computed
       formattedPeople,
+      peopleArray, // 暴露计算属性
       
       // Actions
       initializeStore,
-      fetchUserList
+      fetchUserList,
+      checkLasttimeAndUpdate // 暴露给外部调用
     }
   },
   {

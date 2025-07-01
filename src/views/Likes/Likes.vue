@@ -136,7 +136,8 @@ const activeFilter = ref<'liked' | 'likedBy'>('liked');
 // 获取用户字典（从userListStore中获取所有用户信息）
 const userDict = computed(() => {
   const dict: Record<number, any> = {};
-  userListStore.people.forEach(user => {
+  // 使用peopleArray代替people
+  userListStore.peopleArray.forEach(user => {
     dict[user.id] = user;
   });
   return dict;
@@ -272,7 +273,7 @@ onMounted(async () => {
   await likeStore.fetchLikes();
   
   // 确保用户列表数据已加载
-  if (userListStore.people.length === 0) {
+  if (userListStore.peopleArray.length === 0) {
     await userListStore.fetchUserList();
   }
 });

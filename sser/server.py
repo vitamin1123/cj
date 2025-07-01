@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request, HTTPException, Response, UploadFile, File, Depends, Header
+from fastapi import FastAPI, Request, HTTPException, Response, UploadFile, File, Depends, Header ,Body
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi_cache.decorator import cache
 from pathlib import Path
 import requests
+import json
 import uvicorn
 import hashlib
 import hmac
@@ -15,7 +16,6 @@ import asyncio
 import random
 import time
 import string
-import json
 from sqlalchemy import event, func
 from sqlalchemy.sql import text
 from sqlalchemy import delete, update
@@ -76,7 +76,7 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "123123123-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_SECRET = "81efd3fc-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -92,7 +92,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "123123123123123",  # 请替换为您的正式AppSecret
+    "secret": "f50e7a202c919ec681ed82b79598673b",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -1054,54 +1054,61 @@ def setup_background_cleaner():
     scheduler.add_job(clean_old_visits, 'interval', hours=1)
     scheduler.start()
 
-@app.get("/explore_people")
-async def explore_people():
+@app.get("/explore_people_dic")
+async def explore_people_dic():
     with Session(engine) as session:
         try:
-            stmt = text("""
+            # 第一次查询：获取最大更新时间
+            lasttime_stmt = text("SELECT MAX(updated_at) as lasttime FROM user")
+            lasttime_result = session.execute(lasttime_stmt).fetchone()
+            lasttime = lasttime_result[0] if lasttime_result else None
+
+            # 第二次查询：获取所有用户数据
+            users_stmt = text("""
                 SELECT
-                    IFNULL(
-                        (SELECT JSON_OBJECTAGG(
-                            CAST(id AS CHAR),  
-                            JSON_OBJECT(
-                                'gender', gender,
-                                'birth_date', DATE_FORMAT(birth_date, '%Y-%m-%dT%H:%i:%s'),
-                                'height', height,
-                                'avatar', avatar,
-                                'education', education,
-                                'id', id,
-                                'income_level', income_level,
-                                'mem', mem,
-                                'nickname', nickname,
-                                'occupation', occupation,
-                                'photo', first_photo,
-                                'region_code', region_code,
-                                'weight', weight
-                            )
-                        ) FROM user),
-                        JSON_OBJECT()
-                    ) as people_json,  -- 返回对象而非数组
-                    MAX(updated_at) as lasttime
+                    id, gender, birth_date, height, avatar, education,
+                    income_level, mem, nickname, occupation, first_photo as photo,
+                    region_code, weight
                 FROM user
             """)
+            users = session.execute(users_stmt).fetchall()
 
-            result = session.execute(stmt).fetchone()
-            people_dict = result[0] if result else {}
-            
+            # 构建用户字典，键为字符串形式的用户ID
+            people_dict = {}
+            for user in users:
+                # 格式化出生日期（如果存在）
+                birth_date = user.birth_date.strftime('%Y-%m-%dT%H:%M:%S') if user.birth_date else None
+
+                people_dict[str(user.id)] = {
+                    'id': user.id,
+                    'gender': user.gender,
+                    'birth_date': birth_date,
+                    'height': user.height,
+                    'avatar': user.avatar,
+                    'education': user.education,
+                    'income_level': user.income_level,
+                    'mem': user.mem,
+                    'nickname': user.nickname,
+                    'occupation': user.occupation,
+                    'photo': user.photo,
+                    'region_code': user.region_code,
+                    'weight': user.weight
+                }
+
             return {
-                "people": json.dumps(people_dict),  # 直接返回对象
-                "lasttime": result[1].isoformat() if result and result[1] else None
+                "people": people_dict,  # 直接返回字典对象
+                "lasttime": lasttime.isoformat() if lasttime else None
             }
 
         except Exception as e:
             print(f"Database error: {str(e)}")
             return {
-                "people": "{}",
+                "people": {},
                 "lasttime": None
             }
 
-@app.get("/explore_people_bak_1")
-async def explore_people_bak_1():
+@app.get("/explore_people")
+async def explore_people():
     with Session(engine) as session:
         try:
             # MySQL兼容的JSON查询
@@ -1184,8 +1191,53 @@ async def explore_people_old():
 
     return {"people": people_list}
 
-@app.get('/explore_people_updated_bak')
-async def get_updated_people_bak(since: str):
+@app.get('/explore_people_updated_dic')
+async def get_updated_people_dic(since: str):
+    with Session(engine) as session:
+        stmt = select(User).where(User.updated_at > since)
+        results = session.exec(stmt).all()
+
+        # 创建用户字典，键为用户ID，值为用户对象
+        people_dict = {}
+        max_updated_at = None
+
+        for user in results:
+            # 将用户对象转换为字典
+            user_dict = {
+                'avatar': user.avatar,
+                'birth_date': user.birth_date.isoformat() if user.birth_date else None,
+                'education': user.education,
+                'gender': user.gender,
+                'height': user.height,
+                'id': user.id,
+                'income_level': user.income_level,
+                'mem': user.mem,
+                'nickname': user.nickname,
+                'occupation': user.occupation,
+                'photo': user.photo,
+                'region_code': user.region_code,
+                'weight': user.weight,
+                'updated_at': user.updated_at.isoformat() if user.updated_at else None
+            }
+
+            # 添加到字典，键为ID
+            people_dict[str(user.id)] = user_dict
+
+            # 更新最大更新时间
+            if user.updated_at:
+                if max_updated_at is None or user.updated_at > max_updated_at:
+                    max_updated_at = user.updated_at
+
+        # 如果没有新数据，返回原始时间
+        lasttime = max_updated_at.isoformat() if max_updated_at else since
+
+        return {
+            'people': people_dict,  # 返回字典格式
+            'lasttime': lasttime
+        }
+
+@app.get('/explore_people_updated')
+async def get_updated_people(since: str):
     with Session(engine) as session:
         stmt = select(User).where(User.updated_at > since)
         results = session.exec(stmt).all()
@@ -1220,6 +1272,76 @@ async def get_interested_users():
             status_code=500,
             detail=f"获取感兴趣用户失败: {str(e)}"
         )
+
+@app.post("/visit-count")
+async def get_visit_count(
+    data: dict = Body(...),  # 使用 Body 自动解析 JSON
+    openid: str = Depends(get_current_user)
+):
+    """获取来访数量（无时间过滤）"""
+    target_user_id = data.get("user_id")
+    
+    with Session(engine) as session:
+        if not target_user_id:
+            user = session.exec(select(User.id).where(User.openid == openid)).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="用户不存在")
+            target_user_id = user[0]
+        
+        # 移除了时间过滤条件
+        count = session.scalar(
+            text("""
+                SELECT COUNT(*) 
+                FROM user_visits 
+                WHERE target_id = :target_id
+            """),
+            {"target_id": target_user_id}
+        )
+        
+        return {"count": count}
+
+@app.post("/visit-records")
+async def get_visit_records(
+    data: dict = Body(...),  # 使用 Body 自动解析 JSON
+    openid: str = Depends(get_current_user)
+):
+    """获取来访明细记录（无时间过滤）"""
+    target_user_id = data.get("user_id")
+    
+    with Session(engine) as session:
+        if not target_user_id:
+            user = session.exec(select(User.id).where(User.openid == openid)).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="用户不存在")
+            target_user_id = user.id
+        
+        # 移除了时间过滤条件
+        records = session.exec(
+            text("""
+                SELECT 
+                    u.id, 
+                    u.nickname, 
+                    u.avatar, 
+                    uv.created_at
+                FROM user_visits uv
+                JOIN user u ON uv.visitor_id = u.id
+                WHERE uv.target_id = :target_id
+                ORDER BY uv.created_at DESC
+                LIMIT 100
+            """),
+            {"target_id": target_user_id}
+        ).mappings().all()
+        
+        formatted_records = []
+        for record in records:
+            formatted_records.append({
+                "id": record["id"],
+                "nickname": record["nickname"],
+                "avatar": record["avatar"],
+                "visited_at": record["created_at"].isoformat()
+            })
+        
+        return {"records": formatted_records}
 
 
 if __name__ == "__main__":

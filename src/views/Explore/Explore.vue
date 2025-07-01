@@ -712,6 +712,53 @@ const formatLunar = (date: Date | null): Zodiac => {
 const loadUserProfiles = async () => {
   const userListStore = useUserListStore();
   try {
+    // 直接从store获取用户数组
+    allPeopleList.value = userListStore.peopleArray.map(profile => {
+      // 处理出生年份
+      const birthYear = profile.birth_date 
+        ? new Date(profile.birth_date).getFullYear() 
+        : 0;
+      
+      // 计算生肖
+      let zodiac = '未知';
+      try {
+        if (profile.birth_date) {
+          const zodiacRaw = lunisolar(new Date(profile.birth_date)).format('cZ');
+          zodiac = zodiacMapping[zodiacRaw as Zodiac] || '未知';
+        }
+      } catch (error) {
+        console.error('计算生肖失败:', error);
+      }
+
+      return {
+        id: profile.id,
+        nickname: profile.nickname,
+        birthYear,
+        zodiac,
+        mem: profile.mem,
+        height: profile.height,
+        gender: profile.gender,
+        region: profile.region_code,
+        occupation: profile.occupation,
+        education: profile.education,
+        avatar: profile.avatar,
+        photo: profile.photo,
+        liked: likeStore.hasLiked(profile.id),
+        isNew: false
+      };
+    });
+
+    filteredPeopleList.value = [...allPeopleList.value];
+    return true;
+  } catch (error) {
+    console.error('加载用户数据失败:', error);
+    showFailToast('加载数据失败');
+    return false;
+  }
+};
+const loadUserProfiles_1 = async () => {
+  const userListStore = useUserListStore();
+  try {
     // await userListStore.fetchUserList();
     
     allPeopleList.value = userListStore.formattedPeople.map(profile => ({
