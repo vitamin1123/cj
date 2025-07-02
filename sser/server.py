@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Response, UploadFile, File, Depends, Header ,Body
+from fastapi import FastAPI, Request, HTTPException, Response, UploadFile, File, Depends, Body ,Header
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -76,7 +76,7 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
 
 # JWT配置
-JWT_SECRET = "81efd3fc-4a88-4314-9794-3c8db7004f4b"  # 替换为强密钥
+JWT_SECRET = "81efd3fc-4a88-4314-9794-124556666"  # 替换为强密钥
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7天有效期
 
@@ -92,7 +92,7 @@ app.add_middleware(
 # 配置微信测试号信息
 WECHAT_CONFIG = {
     "appid": "wxccbf0238cab0a75c",  # 请替换为您的正式AppID
-    "secret": "f50e7a202c919ec681ed82b79598673b",  # 请替换为您的正式AppSecret
+    "secret": "gsfdgsdf45dfgj3ug45",  # 请替换为您的正式AppSecret
     "token_expire": 7200
 }
 
@@ -123,10 +123,8 @@ class User(SQLModel, table=True):
         sa_column_kwargs={"onupdate": lambda: datetime.now(beijing_tz)}
     )
 
-# 数据库连接
-DATABASE_URL = "mysql+pymysql://root:1234%40Qazx@localhost/cj"
-# DATABASE_URL = "mysql+pymysql://root:1234%40Qazx@localhost/cj?charset=utf8mb4&time_zone=%2B08:00"
-# DATABASE_URL = "mysql+pymysql://root:1234%40Qazx@localhost/cj?charset=utf8mb4&local_infile=1&timezone=+08:00"
+
+
 engine = create_engine(DATABASE_URL)
 @event.listens_for(engine, "connect")
 def set_time_zone(dbapi_connection, connection_record):
@@ -234,8 +232,8 @@ async def wechat_callback(code: str, state: str = None):
     openid = result["openid"]
     # 生成JWT
     token = create_jwt_token(openid)
-    redirect_url = f"http://localhost:5173/auth-success?token={token}"
-    #redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
+    #redirect_url = f"http://localhost:5173/auth-success?token={token}"
+    redirect_url = f"http://www.tianshunchenjie.com/auth-success?token={token}"
     print(f"Redirecting to: {redirect_url}")
     return RedirectResponse(url=redirect_url)
 
@@ -1280,24 +1278,24 @@ async def get_visit_count(
 ):
     """获取来访数量（无时间过滤）"""
     target_user_id = data.get("user_id")
-    
+
     with Session(engine) as session:
         if not target_user_id:
             user = session.exec(select(User.id).where(User.openid == openid)).first()
             if not user:
                 raise HTTPException(status_code=404, detail="用户不存在")
-            target_user_id = user[0]
-        
+            target_user_id = user
+
         # 移除了时间过滤条件
         count = session.scalar(
             text("""
-                SELECT COUNT(*) 
-                FROM user_visits 
+                SELECT COUNT(*)
+                FROM user_visits
                 WHERE target_id = :target_id
             """),
             {"target_id": target_user_id}
         )
-        
+
         return {"count": count}
 
 @app.post("/visit-records")
@@ -1307,21 +1305,21 @@ async def get_visit_records(
 ):
     """获取来访明细记录（无时间过滤）"""
     target_user_id = data.get("user_id")
-    
+
     with Session(engine) as session:
         if not target_user_id:
             user = session.exec(select(User.id).where(User.openid == openid)).first()
             if not user:
                 raise HTTPException(status_code=404, detail="用户不存在")
-            target_user_id = user.id
-        
+            target_user_id = user
+
         # 移除了时间过滤条件
         records = session.exec(
             text("""
-                SELECT 
-                    u.id, 
-                    u.nickname, 
-                    u.avatar, 
+                SELECT
+                    u.id,
+                    u.nickname,
+                    u.avatar,
                     uv.created_at
                 FROM user_visits uv
                 JOIN user u ON uv.visitor_id = u.id
@@ -1331,7 +1329,7 @@ async def get_visit_records(
             """),
             {"target_id": target_user_id}
         ).mappings().all()
-        
+
         formatted_records = []
         for record in records:
             formatted_records.append({
@@ -1340,9 +1338,8 @@ async def get_visit_records(
                 "avatar": record["avatar"],
                 "visited_at": record["created_at"].isoformat()
             })
-        
-        return {"records": formatted_records}
 
+        return {"records": formatted_records}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
