@@ -67,6 +67,7 @@
           v-for="user in list" 
           :key="user.id" 
           class="user-card"
+          @click="goToProfile(user.id)"
         >
           <div class="card-header">
             <div class="avatar-container">
@@ -206,6 +207,10 @@ const pageSize = ref(20);               // 每页数量
 const activeTab = ref<'all' | 'male' | 'female' | 'top'>('all')
 const searchKeyword = ref('');
 const offset = ref({ x: 0.05 * window.innerWidth, y: 0.03 * window.innerHeight });
+
+const goToProfile = (id: number) => {
+  router.replace(`/profile/${id}`);
+};
 
 const goBack = () => {
   const previousRoute = getPreviousRoute();
@@ -411,6 +416,12 @@ onMounted(() => {
   padding: 16px;
   margin-bottom: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.user-card:active {
+  transform: scale(0.98); /* 点击时轻微缩小 */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* 点击时阴影减小 */
 }
 
 .card-header {

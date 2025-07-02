@@ -59,6 +59,12 @@ const router = createRouter({
       meta: { title: '详细信息' }
     },
     {
+      path: '/profile/:id',
+      name: 'profile',
+      component: () => import('@/views/Profile/Profile.vue'),
+      meta: { title: '用户资料' }
+    },
+    {
       path: '/explore',
       name: 'explore',
       component: () => import('@/views/Explore/Explore.vue'),
