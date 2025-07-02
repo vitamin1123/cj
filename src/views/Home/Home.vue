@@ -166,7 +166,7 @@
               <div class="card-content">
                 <div class="user-header">
                   <div class="user-id">编号{{ user.id }}</div>
-                  <div class="heart-icon">
+                  <div class="heart-icon" :class="{ liked: likeStore.hasLiked(user.id) }">
                     <van-icon name="like" />
                   </div>
                 </div>
@@ -698,6 +698,16 @@ const goToDetail = (id: number) => {
   border: 1px solid #D9D9D9;
   display: flex;
   flex-direction: column;
+}
+
+.recommend-card .heart-icon {
+  font-size: 20px;
+  color: #ccc; /* 默认灰色 */
+  transition: color 0.3s;
+}
+
+.recommend-card .heart-icon.liked {
+  color: #ff4757; /* 喜欢时变为红色 */
 }
 
 .card-image-container {

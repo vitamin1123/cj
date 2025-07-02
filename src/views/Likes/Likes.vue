@@ -89,7 +89,7 @@ import { showConfirmDialog, showToast  } from 'vant';
 import { useLikeStore } from '@/store/likeStore';
 import { useUserListStore } from '@/store/userList';
 import TabBar from '@/components/TabBar.vue';
-
+import { likeUser } from '@/api/like';
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -251,7 +251,10 @@ const confirmRemoveLike = (person: LikedPerson) => {
   });
 };
 
-const removeLike = (person: LikedPerson) => {
+
+
+const removeLike = async(person: LikedPerson) => {
+  await likeUser(person.id, 'unlike');
   // 调用likeStore的removeLike方法
   likeStore.removeLike(person.id);
   

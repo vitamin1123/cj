@@ -213,12 +213,12 @@ const goToProfile = (id: number) => {
 };
 
 const goBack = () => {
-  const previousRoute = getPreviousRoute();
-  if (previousRoute) {
-    router.replace({ path: previousRoute.path, query: previousRoute.query, params: previousRoute.params });
-  } else {
+  //const previousRoute = getPreviousRoute();
+  //if (previousRoute) {
+  //  router.replace({ path: previousRoute.path, query: previousRoute.query, params: previousRoute.params });
+  //} else {
     router.replace('/userCenter');
-  }
+  //}
 };
 
 
