@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 import { setPreviousRoute } from '@/utils/routeHistory';
 // 导入我们新创建的微信授权工具函数
 import { triggerWechatLogin } from '@/utils/authUtils'; 
+import { useUrlStore } from '@/store/urlStore'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -104,8 +105,13 @@ const router = createRouter({
 // 因为它们已经分别被 apiClient 封装和移动到 authUtils.ts
 
 router.beforeEach((to, from, next) => {
+  
   document.title = (to.meta?.title as string) ?? '自助功能';
-
+  const urlStore = useUrlStore()
+  
+  // 构建完整URL（包含origin）
+  const fullUrl = `${window.location.origin}${to.fullPath}`
+  urlStore.updateCurrentUrl(fullUrl)
   // 允许访问的白名单路由
   if (['/reopen', '/auth-success', '/404'].includes(to.path)) {
     return next();

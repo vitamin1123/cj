@@ -188,7 +188,7 @@ import { areaList } from '@vant/area-data';
 import apiClient from '@/plugins/axios';
 import { likeUser } from '@/api/like';
 import { useLikeStore } from '@/store/likeStore';
-
+import { useUrlStore } from '@/store/urlStore'
 import { initWechatSDK, setWechatShareInfo } from '@/utils/wechat';
 
 const showShareGuide = ref(false); // 控制扇形遮罩引导
@@ -226,15 +226,22 @@ const isLocalLiked = computed(() => {
   return likeStore.hasLiked(userId);
 });
 
+
+const isWechatInitialized = ref(false);
 // 新增：处理分享
 const handleShare = async () => {
   try {
-    // 1. 获取当前页面URL（去除hash）
-    const currentUrl = window.location.href.split('#')[0];
+    // 防止重复初始化
+    if (isWechatInitialized.value) {
+      showShareGuide.value = true;
+      return;
+    }
+    
+    
     
     // 2. 初始化微信SDK
-    await initWechatSDK(currentUrl);
-    
+    await initWechatSDK();
+    isWechatInitialized.value = true;
     // 3. 设置分享内容
     const shareTitle = `编号${userInfo.value.id} ${userInfo.value.birth_date ? new Date(userInfo.value.birth_date).getFullYear() : ''}年`;
     let shareDesc = userInfo.value.mem || '暂无个人简介';
@@ -244,15 +251,17 @@ const handleShare = async () => {
     const shareImg = userInfo.value.first_photo 
       ? `${window.location.origin}/photo/${userInfo.value.first_photo}`
       : `${window.location.origin}/tianshun.jpg`;
-    const shareLink = `${window.location.origin}/detail/${route.params.id}`;
+    const urlStore = useUrlStore()
+    const shareLink = urlStore.currentUrl
+    // const shareLink = `${window.location.origin}/detail/${route.params.id}`;
     console.log('shareLink', shareLink,shareImg)
     setWechatShareInfo({
       title: shareTitle,
       desc: shareDesc,
       link: shareLink,
       imgUrl: shareImg,
-      success: () => showToast('分享成功'),
-      cancel: () => showToast('分享已取消')
+      // success: () => showToast('分享成功'),
+      // cancel: () => showToast('分享已取消')
     });
     showShareGuide.value = true;
     // showToast('点击右上角分享给朋友');

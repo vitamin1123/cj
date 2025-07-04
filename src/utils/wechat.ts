@@ -1,5 +1,6 @@
 import wx from 'weixin-js-sdk';
 import apiClient from '@/plugins/axios';
+import { useUrlStore } from '@/store/urlStore'
 
 // 定义微信配置对象类型
 interface WechatConfig {
@@ -41,10 +42,13 @@ export const getWechatConfig = async (url: string): Promise<WechatConfig> => {
  * @param url 当前页面的完整URL（不包含#及其后面部分）
  * @returns Promise<void>
  */
-export const initWechatSDK = async (url: string): Promise<void> => {
+export const initWechatSDK = async (): Promise<void> => {
   try {
+    const urlStore = useUrlStore()
     // 获取签名配置
-    const config = await getWechatConfig(url);
+    const signatureUrl = urlStore.getSignatureUrl()
+    console.log('头疼的地方:',signatureUrl)
+    const config = await getWechatConfig(signatureUrl);
     
     // 配置微信JS-SDK
     wx.config({
@@ -65,7 +69,9 @@ export const initWechatSDK = async (url: string): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       wx.ready(() => {
         console.log('微信JS-SDK初始化成功');
-        resolve();
+        resolve(); 
+
+
       });
       
       wx.error((err) => {
