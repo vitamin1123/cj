@@ -14,32 +14,32 @@
     <div class="content">
       <!-- 统计卡片区域 - 修复对齐问题 -->
       <div class="stats-container">
-        <div class="stat-card" @click="showStatPopup('visited')">
+        <div class="stat-card" @click="showStatPopup('visit')">
           <div class="stat-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
           </div>
-          <div class="stat-value">128</div>
+          <div class="stat-value">{{ statValues.visit || 0 }}</div>
           <div class="stat-label">访问统计</div>
         </div>
-        <div class="stat-card" @click="showStatPopup('visit')">
+        <div class="stat-card" @click="showStatPopup('visited')">
           <div class="stat-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 9c-1.31 0-2.42.83-2.83 2H2v2h15.17c.41 1.17 1.52 2 2.83 2 1.66 0 3-1.34 3-3s-1.34-3-3-3zm0 4c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM4 5c1.31 0 2.42.83 2.83 2H22v2H6.83C6.42 10.83 5.31 11.66 4 11.66c-1.66 0-3-1.34-3-3s1.34-3 3-3zm0 4c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1z"/></svg>
           </div>
-          <div class="stat-value">89</div>
+          <div class="stat-value">{{ statValues.visited || 0 }}</div>
           <div class="stat-label">被访统计</div>
         </div>
         <div class="stat-card" @click="showStatPopup('likes')">
           <div class="stat-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           </div>
-          <div class="stat-value">42</div>
+          <div class="stat-value">{{ statValues.likes || 0 }}</div>
           <div class="stat-label">点赞统计</div>
         </div>
         <div class="stat-card" @click="showStatPopup('liked')">
           <div class="stat-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           </div>
-          <div class="stat-value">67</div>
+          <div class="stat-value">{{ statValues.liked || 0 }}</div>
           <div class="stat-label">被赞统计</div>
         </div>
       </div>
@@ -229,6 +229,36 @@ const statPopup = ref({
   list: [] as Array<{ id: number; created_at?: string }>
 });
 
+const preloadedStats = ref({
+  visited: {
+    topList: [] as Array<{ id: number; count: number }>,
+    chartData: [] as Array<{ date: string; count: number }>
+  },
+  visit: {
+    topList: [] as Array<{ id: number; count: number }>,
+    chartData: [] as Array<{ date: string; count: number }>
+  },
+  likes: {
+    list: [] as Array<{ id: number; created_at?: string }>
+  },
+  liked: {
+    list: [] as Array<{ id: number; created_at?: string }>
+  }
+});
+
+const statValues = computed(() => ({
+  // 计算访问统计（visit）: 对topList中所有count求和
+  visit: preloadedStats.value.visit.topList.reduce((sum, item) => sum + item.count, 0),
+  
+  // 计算被访统计（visited）: 对topList中所有count求和
+  visited: preloadedStats.value.visited.topList.reduce((sum, item) => sum + item.count, 0),
+  
+  // 计算点赞统计（likes）: 列表长度
+  likes: preloadedStats.value.likes.list.length,
+  
+  // 计算被赞统计（liked）: 列表长度
+  liked: preloadedStats.value.liked.list.length
+}));
 // 显示统计弹窗
 const showStatPopup = async (type: string) => {
   const userId = parseInt(route.params.id as string);
@@ -238,8 +268,8 @@ const showStatPopup = async (type: string) => {
   
   // 设置标题
   const titles = {
-    visited: '访问统计',
-    visit: '被访统计',
+    visited: '被访统计',
+    visit: '访问统计',
     likes: '点赞统计',
     liked: '被赞统计'
   };
@@ -247,8 +277,8 @@ statPopup.value.title = titles[type as keyof typeof titles];
   
   // 设置列表标题
   const listTitles = {
-    visited: '访问排行榜',
-    visit: '被访排行榜',
+    visited: '被访排行榜',
+    visit: '访问排行榜',
     likes: '最近点赞',
     liked: '最近被赞'
   };
@@ -261,25 +291,21 @@ statPopup.value.title = titles[type as keyof typeof titles];
   
   try {
     // 调用对应API
-    let response;
+    
     switch (type) {
       case 'visited':
-        response = await apiClient.get(`/api/stat/visited/${userId}`);
-        statPopup.value.chartData = response.data.chart_data;
-        statPopup.value.topList = response.data.top_list;
+        statPopup.value.chartData = preloadedStats.value.visited.chartData;
+        statPopup.value.topList = preloadedStats.value.visited.topList;
         break;
       case 'visit':
-        response = await apiClient.get(`/api/stat/visit/${userId}`);
-        statPopup.value.chartData = response.data.chart_data;
-        statPopup.value.topList = response.data.top_list;
+        statPopup.value.chartData = preloadedStats.value.visit.chartData;
+        statPopup.value.topList = preloadedStats.value.visit.topList;
         break;
       case 'likes':
-        response = await apiClient.get(`/api/stat/likes/${userId}`);
-        statPopup.value.list = response.data.list;
+        statPopup.value.list = preloadedStats.value.likes.list;
         break;
       case 'liked':
-        response = await apiClient.get(`/api/stat/liked/${userId}`);
-        statPopup.value.list = response.data.list;
+        statPopup.value.list = preloadedStats.value.liked.list;
         break;
     }
   } catch (error) {
@@ -416,6 +442,44 @@ const fetchUserData = async () => {
   }
 };
 
+// 新增：预加载统计数据
+const preloadStatsData = async () => {
+  const userId = parseInt(route.params.id as string);
+  
+  try {
+    // 并发请求所有统计接口
+    const [visitedRes, visitRes, likesRes, likedRes] = await Promise.all([
+      apiClient.get(`/api/stat/visited/${userId}`),
+      apiClient.get(`/api/stat/visit/${userId}`),
+      apiClient.get(`/api/stat/likes/${userId}`),
+      apiClient.get(`/api/stat/liked/${userId}`)
+    ]);
+    
+    // 保存预加载的数据
+    preloadedStats.value.visited = {
+      topList: visitedRes.data.top_list,
+      chartData: visitedRes.data.chart_data
+    };
+    
+    preloadedStats.value.visit = {
+      topList: visitRes.data.top_list,
+      chartData: visitRes.data.chart_data
+    };
+    
+    preloadedStats.value.likes = {
+      list: likesRes.data.list
+    };
+    
+    preloadedStats.value.liked = {
+      list: likedRes.data.list
+    };
+    
+  } catch (error) {
+    console.error('预加载统计信息失败', error);
+    showToast('加载统计信息失败');
+  }
+};
+
 // 返回上一页
 const goBack = () => {
   const previousRoute = getPreviousRoute();
@@ -428,6 +492,7 @@ const goBack = () => {
 
 onMounted(() => {
   fetchUserData();
+  preloadStatsData();
 });
 </script>
 
