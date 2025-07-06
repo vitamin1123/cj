@@ -67,9 +67,9 @@
           v-for="user in list" 
           :key="user.id" 
           class="user-card"
-          @click="goToProfile(user.id)"
+          
         >
-          <div class="card-header">
+          <div class="card-header" @click="goToProfile(user.id)">
             <div class="avatar-container">
               <van-image
                 width="48"
@@ -116,6 +116,7 @@
             <div class="actions">
               <!-- 置顶按钮 -->
               <van-switch 
+                @click.stop
                 :model-value="user.is_top"
                 :loading="user.topping"
                 size="24px"

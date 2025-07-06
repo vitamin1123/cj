@@ -8,6 +8,7 @@ import { setPreviousRoute } from '@/utils/routeHistory';
 // 导入我们新创建的微信授权工具函数
 import { triggerWechatLogin } from '@/utils/authUtils'; 
 import { useUrlStore } from '@/store/urlStore'
+import { usePaymentStore } from '@/store/paymentStore';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,6 +37,7 @@ const router = createRouter({
       component: Result404,
       meta: { title: '404' }
     },
+    
     {
       path: '/',
       name: 'index',
@@ -72,6 +74,12 @@ const router = createRouter({
       meta: { title: '寻觅' ,keepAlive: true }
     },
     {
+      path: '/payment',
+      name: 'payment',
+      component: () => import('@/views/Payment/Payment.vue'),
+      meta: { title: '开通会员' }
+    },
+    {
       path: '/likes',
       name: 'likes',
       component: () => import('@/views/Likes/Likes.vue'),
@@ -104,8 +112,8 @@ const router = createRouter({
 // **删除这里原有的 axios.defaults.baseURL 和 triggerWechatLogin 函数定义**
 // 因为它们已经分别被 apiClient 封装和移动到 authUtils.ts
 
-router.beforeEach((to, from, next) => {
-  
+router.beforeEach(async (to, from, next) => {
+  const paymentStore = usePaymentStore();
   document.title = (to.meta?.title as string) ?? '自助功能';
   const urlStore = useUrlStore()
   
@@ -113,7 +121,9 @@ router.beforeEach((to, from, next) => {
   const fullUrl = `${window.location.origin}${to.fullPath}`
   urlStore.updateCurrentUrl(fullUrl)
   // 允许访问的白名单路由
-  if (['/reopen', '/auth-success', '/404'].includes(to.path)) {
+  const publicRoutes = ['/reopen', '/auth-success', '/404', '/payment', '/home'];
+  
+  if (publicRoutes.includes(to.path)) {
     return next();
   }
 
@@ -131,6 +141,19 @@ router.beforeEach((to, from, next) => {
       // 在此情况下不调用 next()，因为页面会直接重定向，防止死循环或重复导航
     }
   } else {
+    const requiresPayment = !publicRoutes.includes(to.path);
+    
+    if (requiresPayment) {
+      // 如果支付状态尚未加载，先加载
+      if (!paymentStore.isPaid && !paymentStore.loading) {
+        await paymentStore.checkPaymentStatus();
+      }
+      
+      // 如果未支付，重定向到支付页面
+      if (!paymentStore.isPaid) {
+        return next({ path: '/payment', replace: true });
+      }
+    }
     next();
   }
 });
