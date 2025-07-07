@@ -45,7 +45,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import apiClient from '@/plugins/axios'
 import wx from 'weixin-js-sdk'; // 使用安装的微信JS-SDK包
 import { usePaymentStore } from '@/store/paymentStore';
 
@@ -69,7 +69,7 @@ const initWechatSDK = async () => {
     const url = window.location.href.split('#')[0];
     
     // 2. 从后端获取JS-SDK配置
-    const configResponse = await axios.get('/api/wechat/jssdk-signature', {
+    const configResponse = await apiClient.get('/api/wechat/jssdk-signature', {
       params: { url }
     });
     
@@ -111,8 +111,8 @@ const handlePayment = async () => {
   
   try {
     // 1. 从后端获取支付参数
-    const response = await axios.post('/api/create-payment', {
-      amount: 20000, // 金额单位：分（200元 = 20000分）
+    const response = await apiClient.post('/api/create-payment', {
+      amount: 1, // 金额单位：分（200元 = 20000分）
       description: '开通一年会员服务'
     });
     const paymentParams = response.data;
@@ -124,14 +124,17 @@ const handlePayment = async () => {
       package: paymentParams.package,
       signType: paymentParams.signType,
       paySign: paymentParams.paySign,
-      success: () => {
+      success: async() => {
         // 支付成功
         showSuccess.value = true;
         loading.value = false;
         
         // 更新支付状态
         paymentStore.setPaymentStatus(true);
-        
+        const statusRes = await apiClient.get('/api/check-payment');
+          if (statusRes.data.is_paid) {
+            console.log('支付状态验证成功');
+          }
         // 可选：显示成功状态几秒后自动跳转
         setTimeout(() => {
           goToHome();

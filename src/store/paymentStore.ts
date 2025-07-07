@@ -1,6 +1,6 @@
 // src/store/paymentStore.ts
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import apiClient from '@/plugins/axios'
 
 interface PaymentState {
   isPaid: boolean;
@@ -18,7 +18,7 @@ export const usePaymentStore = defineStore('payment', {
     async checkPaymentStatus() {
       this.loading = true;
       try {
-        const response = await axios.get('/api/check-payment');
+        const response = await apiClient.get('/api/check-payment');
         this.isPaid = response.data.is_paid;
         this.expireAt = response.data.expire_at;
       } catch (error) {

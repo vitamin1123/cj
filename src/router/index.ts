@@ -140,7 +140,8 @@ router.beforeEach(async (to, from, next) => {
       triggerWechatLogin();
       // 在此情况下不调用 next()，因为页面会直接重定向，防止死循环或重复导航
     }
-  } else {
+  } 
+  else {
     const requiresPayment = !publicRoutes.includes(to.path);
     
     if (requiresPayment) {
