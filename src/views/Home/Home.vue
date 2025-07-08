@@ -201,6 +201,8 @@ import { useUserInfoStore } from '@/store/userinfo'
 import { useUserListStore } from '@/store/userList'
 import apiClient from '@/plugins/axios';
 import { useLikeStore } from '@/store/likeStore';
+import { usePaymentStore } from '@/store/paymentStore'; 
+import { triggerWechatLogin } from '@/utils/authUtils'; 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -214,6 +216,7 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const exploreStore = useExploreStore();
 const userStore = useUserInfoStore()
 const userListStore = useUserListStore()
+const paymentStore = usePaymentStore();
 const activeTab = ref('home');
 const router = useRouter();
 const isSearchFocused = ref(false);
@@ -256,6 +259,9 @@ const checkAuth = async () => {
   authError.value = null;
   try {
     console.log('看看首页的token：',authStore.token);
+    if(!authStore.token) {
+      triggerWechatLogin();
+    }
   } catch (error: any) {
     console.error('Authentication check failed:', error);
     authError.value = error.message || '认证检查失败，请稍后重试。';
@@ -311,14 +317,39 @@ const handleSearch = () => {
   closeSearch();
 };
 
+const initializeUserData = async () => {
+  if (!paymentStore.isPaid) return;
+  
+  try {
+    await userListStore.initializeStore();
+    await userStore.fetchUserProfile();
+    await likeStore.fetchLikes();
+  } catch (error) {
+    console.error('用户数据初始化失败:', error);
+  }
+};
+
 onMounted(async() => {
   exploreStore.loadState();
   await checkAuth();
-  await userListStore.initializeStore();
-  await userStore.fetchUserProfile();
-  await likeStore.fetchLikes()
   await fetchNewcomers();
   await fetchInter()
+  // console.log('authStore.token: ',authStore.token)
+  if (authStore.token) {
+    // 检查支付状态（如果尚未加载）
+    if (!paymentStore.isPaid && !paymentStore.loading) {
+      try {
+        await paymentStore.checkPaymentStatus();
+      } catch (error) {
+        console.error('支付状态检查失败:', error);
+      }
+    }
+    
+    // 如果已支付，立即初始化用户数据
+    if (paymentStore.isPaid) {
+      await initializeUserData();
+    }
+  }
 });
 
 const handleSearchFocus = () => {
