@@ -48,7 +48,7 @@
         <div class="skeleton-cards">
           <van-skeleton 
             class="skeleton-recommend-card"
-            style="height: 366px; width: 224px;"
+            style="height: 320px; width: 200px;"
           />
         </div>
       </div>
@@ -153,19 +153,27 @@
       <!-- 推荐板块 -->
       <div class="recommend-section">
         <h2 class="section-title">可能感兴趣</h2>
-        <van-swipe class="recommend-swipe" :loop="true" :width="240" :height="366" indicator-color="transparent">
-          <van-swipe-item v-for="i in 4" :key="i">
-            <div class="recommend-card" @click="goToDetail(i)">
-              <div class="card-image"></div>
+        <van-swipe class="recommend-swipe" :loop="true" :width="210" :height="330" indicator-color="transparent">
+          <van-swipe-item v-for="user in filteredRecommendedUsers" :key="user.id">
+            <div class="recommend-card" @click="goToDetail(user.id)">
+              <div class="card-image-container">
+                <img 
+                  :src="user.first_photo ? '/photo/' + user.first_photo : (user.gender === 'female' ? '/avatars/female_def.png' : '/avatars/male_def.png')" 
+                  alt="照片"
+                  class="card-image"
+                />
+              </div>
               <div class="card-content">
-                <div class="name">姓名</div>
-                <div class="height-container">
-                  <div class="height">身高</div>
-                  <div class="heart-icon">
+                <div class="user-header">
+                  <div class="user-id">编号{{ user.id }}</div>
+                  <div class="heart-icon" :class="{ liked: likeStore.hasLiked(user.id) }">
                     <van-icon name="like" />
                   </div>
                 </div>
-                <div class="desc">简介</div>
+                <div class="info-line">
+                  <div class="info-value">{{ getBirthYear(user.birth_date)+'年' }}</div>
+                </div>
+                <div class="desc">{{ truncateMemo(user.mem, 36) }}</div>
               </div>
             </div>
           </van-swipe-item>
@@ -193,6 +201,8 @@ import { useUserInfoStore } from '@/store/userinfo'
 import { useUserListStore } from '@/store/userList'
 import apiClient from '@/plugins/axios';
 import { useLikeStore } from '@/store/likeStore';
+import { usePaymentStore } from '@/store/paymentStore'; 
+import { triggerWechatLogin } from '@/utils/authUtils'; 
 // 导入图标
 import homeIcon from '@/assets/icons/home.svg';
 import homeSelectedIcon from '@/assets/icons/home-selected.svg';
@@ -206,6 +216,7 @@ import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
 const exploreStore = useExploreStore();
 const userStore = useUserInfoStore()
 const userListStore = useUserListStore()
+const paymentStore = usePaymentStore();
 const activeTab = ref('home');
 const router = useRouter();
 const isSearchFocused = ref(false);
@@ -215,17 +226,42 @@ const authStore = useAuthStore();
 const likeStore = useLikeStore();
 const newcomers = ref<any[]>([]);
 const isNewcomersLoading = ref(true); 
-
+const recommendedUsers = ref<any[]>([]);
 const searchKeyword = computed({
   get: () => exploreStore.state.searchKeyword,
   set: (value) => exploreStore.state.searchKeyword = value
 });
+
+const filteredRecommendedUsers = computed(() => {
+  if (!recommendedUsers.value.length) return [];
+  
+const currentUserGender = userStore.profile?.gender;
+  if (!currentUserGender) return recommendedUsers.value;
+  
+  return recommendedUsers.value.filter(user => 
+    currentUserGender === 'male' ? user.gender === 'female' : user.gender === 'male'
+  );
+});
+
+// 新增方法：从生日获取年份
+const getBirthYear = (birthDate: string) => {
+  return birthDate ? new Date(birthDate).getFullYear() : '未知';
+};
+
+// 新增方法：截断过长的简介
+const truncateMemo = (text: string, maxLength: number) => {
+  if (!text) return '';
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+};
 
 const checkAuth = async () => {
   isLoading.value = true;
   authError.value = null;
   try {
     console.log('看看首页的token：',authStore.token);
+    if(!authStore.token) {
+      triggerWechatLogin();
+    }
   } catch (error: any) {
     console.error('Authentication check failed:', error);
     authError.value = error.message || '认证检查失败，请稍后重试。';
@@ -258,7 +294,7 @@ const fetchNewcomers = async () => {
 const fetchInter = async()=> {
   try {
     const response = await apiClient.get('/api/interested');
-    
+    recommendedUsers.value = response.data;
   } catch (error) {
     console.error('获取感兴趣数据失败:', error);
   }finally {
@@ -281,14 +317,39 @@ const handleSearch = () => {
   closeSearch();
 };
 
+const initializeUserData = async () => {
+  if (!paymentStore.isPaid) return;
+  
+  try {
+    await userListStore.initializeStore();
+    await userStore.fetchUserProfile();
+    await likeStore.fetchLikes();
+  } catch (error) {
+    console.error('用户数据初始化失败:', error);
+  }
+};
+
 onMounted(async() => {
   exploreStore.loadState();
   await checkAuth();
-  await userListStore.initializeStore();
-  await userStore.fetchUserProfile();
-  await likeStore.fetchLikes()
   await fetchNewcomers();
   await fetchInter()
+  // console.log('authStore.token: ',authStore.token)
+  if (authStore.token) {
+    // 检查支付状态（如果尚未加载）
+    if (!paymentStore.isPaid && !paymentStore.loading) {
+      try {
+        await paymentStore.checkPaymentStatus();
+      } catch (error) {
+        console.error('支付状态检查失败:', error);
+      }
+    }
+    
+    // 如果已支付，立即初始化用户数据
+    if (paymentStore.isPaid) {
+      await initializeUserData();
+    }
+  }
 });
 
 const handleSearchFocus = () => {
@@ -402,8 +463,8 @@ const goToDetail = (id: number) => {
 }
 
 .skeleton-recommend-card {
-  width: 224px;
-  height: 366px;
+  width: 200px;
+  height: 320px;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -656,27 +717,86 @@ const goToDetail = (id: number) => {
   padding-left: 0;
 }
 
+/* 更新推荐卡片样式 */
 .recommend-card {
   background-color: #FFFFFF;
   border-radius: 8px;
-  width: 224px;
-  height: 366px;
+  width: 200px; /* 缩小卡片宽度 */
+  height: 320px; /* 缩小卡片高度 */
   margin-right: 8px;
   position: relative;
   overflow: hidden;
   border: 1px solid #D9D9D9;
+  display: flex;
+  flex-direction: column;
+}
+
+.recommend-card .heart-icon {
+  font-size: 20px;
+  color: #ccc; /* 默认灰色 */
+  transition: color 0.3s;
+}
+
+.recommend-card .heart-icon.liked {
+  color: #ff4757; /* 喜欢时变为红色 */
+}
+
+.card-image-container {
+  width: 100%;
+  height: 243px; /* 调整为正方形比例 */
+  overflow: hidden;
 }
 
 .card-image {
-  width: calc(100% - 16px);
-  height: 260px;
-  background-color: #D9D9D9;
-  margin: 8px;
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .card-content {
-  padding: 0 16px 16px;
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.user-id {
+  font-size: 14px;
+  font-weight: bold;
+  color: #6A6A6A; /* 改为灰色 */
+}
+
+.heart-icon {
+  font-size: 20px;
+  color: #ff4757;
+}
+
+.info-line {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.info-value {
+  font-size: 12px; /* 统一字体大小 */
+  color: #6A6A6A; /* 统一字体颜色 */
+}
+
+.desc {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.5;
+  flex: 1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4; /* 限制显示4行 */
 }
 
 .name {
@@ -696,19 +816,6 @@ const goToDetail = (id: number) => {
 .height {
   font-size: 12px;
   color: #6A6A6A;
-}
-
-.desc {
-  font-size: 12px;
-  color: #6A6A6A;
-  line-height: 1.4;
-}
-
-.heart-icon {
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  color: #ff4757;
 }
 
 /* 新增骨架屏样式 */

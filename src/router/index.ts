@@ -97,6 +97,12 @@ const router = createRouter({
       meta: { title: '请在微信中打开' }
     },
     {
+      path: '/manacenter',
+      name: 'manacenter',
+      component: () => import('@/views/ManaCenter/ManaCenter.vue'),
+      meta: { title: '管理' }
+    },
+    {
       path: '/mana',
       name: 'mana',
       component: () => import('@/views/Mana/Mana.vue'),
@@ -121,7 +127,7 @@ router.beforeEach(async (to, from, next) => {
   const fullUrl = `${window.location.origin}${to.fullPath}`
   urlStore.updateCurrentUrl(fullUrl)
   // 允许访问的白名单路由
-  const publicRoutes = ['/reopen', '/auth-success', '/404', '/payment', '/home'];
+  const publicRoutes = ['/reopen', '/auth-success', '/404', '/payment', '/home','/userCenter'];
   
   if (publicRoutes.includes(to.path)) {
     return next();

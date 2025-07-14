@@ -63,46 +63,39 @@
     </div>
 
     <!-- 页面内容 -->
-    <div v-else class="page-content" @click="handlePageClick">
-      <!-- 搜索框 -->
-      <div class="search-container" @click.stop>
-        <div class="search-card" :class="{ focused: isSearchFocused }">
-          <div class="search-box">
-            <t-icon name="search" class="search-icon" />
-            <input 
-              type="text" 
-              placeholder="搜索" 
-              class="search-input" 
-              v-model="searchKeyword"
-              @focus="handleSearchFocus"
-              @keyup.enter="handleSearch"
-            />
-          </div>
-          
-          <!-- <div class="search-options" v-if="isSearchFocused">
-            <div class="search-option-item">
-              <div class="option-label">身高</div>
-              <div class="option-input">
-                <input type="text" placeholder="请输入身高" />
-                <van-icon name="clear" class="clear-icon" />
-              </div>
-            </div>
-            <div class="search-option-item">
-              <div class="option-label">区域</div>
-              <div class="option-input">
-                <input type="text" placeholder="请输入区域" />
-                <van-icon name="clear" class="clear-icon" />
-              </div>
-            </div>
-          </div> -->
-        </div>
+    <div v-else class="page-content">
+      <!-- 滚动标语 - 替换原搜索框 -->
+      <div class="notice-container">
+        <van-notice-bar
+          left-icon="volume-o"
+          background="#EBE3D7"
+          color="#6A6A6A"
+          scrollable
+          class="notice-bar"
+        >
+          欢迎来到天顺，祝您早日找到心仪的另一半！❤️
+        </van-notice-bar>
       </div>
 
-      <!-- 其他原有内容保持不变 -->
-      <div class="news-section">
-        <div class="news-card">
-          <div class="news-image"></div>
-          <p class="news-title">新人新闻</p>
+      <!-- 三个功能卡片 -->
+      <div class="action-cards">
+        <div class="action-card" @click="handleAction('contact')">
+          <div class="action-icon">
+            <van-icon name="contact" size="24" color="#6A6A6A" />
+          </div>
+          <div class="action-title">联系红娘</div>
+        </div>
+        <div class="action-card" @click="handleAction('link')">
+          <div class="action-icon">
+            <van-icon name="link-o" size="24" color="#6A6A6A" />
+          </div>
+          <div class="action-title">外部链接</div>
+        </div>
+        <div class="action-card" @click="handleAction('reward')">
+          <div class="action-icon">
+            <van-icon name="cash-back-record" size="24" color="#6A6A6A" />
+          </div>
+          <div class="action-title">打赏</div>
         </div>
       </div>
 
@@ -194,7 +187,7 @@
 import { ref, onMounted , computed} from 'vue';
 import { useExploreStore } from '@/store/exploreStore';
 import TabBar from '@/components/TabBar.vue';
-import { Skeleton } from 'vant';
+import { Skeleton, NoticeBar } from 'vant';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/authStore';
 import { useUserInfoStore } from '@/store/userinfo'
@@ -219,7 +212,6 @@ const userListStore = useUserListStore()
 const paymentStore = usePaymentStore();
 const activeTab = ref('home');
 const router = useRouter();
-const isSearchFocused = ref(false);
 const isLoading = ref(true);
 const authError = ref<string | null>(null);
 const authStore = useAuthStore();
@@ -227,10 +219,6 @@ const likeStore = useLikeStore();
 const newcomers = ref<any[]>([]);
 const isNewcomersLoading = ref(true); 
 const recommendedUsers = ref<any[]>([]);
-const searchKeyword = computed({
-  get: () => exploreStore.state.searchKeyword,
-  set: (value) => exploreStore.state.searchKeyword = value
-});
 
 const filteredRecommendedUsers = computed(() => {
   if (!recommendedUsers.value.length) return [];
@@ -306,17 +294,6 @@ const retryAuth = () => {
   checkAuth();
 };
 
-const handleSearch = () => {
-  // 保存状态到本地存储
-  exploreStore.saveState();
-  
-  // 跳转到探索页面
-  router.replace('/explore');
-  
-  // 关闭搜索框
-  closeSearch();
-};
-
 const initializeUserData = async () => {
   if (!paymentStore.isPaid) return;
   
@@ -352,18 +329,21 @@ onMounted(async() => {
   }
 });
 
-const handleSearchFocus = () => {
-  isSearchFocused.value = true;
-};
-
-const closeSearch = () => {
-  isSearchFocused.value = false;
-};
-
-// 点击页面其他区域关闭搜索框
-const handlePageClick = () => {
-  if (isSearchFocused.value) {
-    closeSearch();
+// 处理功能卡片点击
+const handleAction = (type: string) => {
+  switch (type) {
+    case 'contact':
+      // 联系红娘逻辑
+      console.log('联系红娘');
+      break;
+    case 'link':
+      // 外部链接逻辑
+      console.log('打开外部链接');
+      break;
+    case 'reward':
+      // 打赏逻辑
+      console.log('打赏');
+      break;
   }
 };
 
@@ -527,132 +507,60 @@ const goToDetail = (id: number) => {
   min-height: calc(100vh - 92px);
 }
 
-/* 搜索容器 */
-.search-container {
+/* 滚动标语容器 */
+.notice-container {
   margin-bottom: 16px;
-  position: relative;
-  z-index: 10;
-  background-color: #F2EEE8;
+  border-radius: 50px;
+  overflow: hidden;
+  background-color: #EBE3D7;
 }
 
-.search-card {
-  background-color: #EBE3D7;
+.notice-bar {
   border-radius: 50px;
   padding: 12px 16px;
-  transition: all 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  transform: translate3d(0, 0, 0);
 }
 
-.search-card.focused {
-  border-radius: 12px;
-  padding-bottom: 16px;
-  position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  max-height: 300px;
-}
-
-.search-box {
+/* 功能卡片容器 */
+.action-cards {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.search-input {
-  border: none;
-  background: transparent;
-  outline: none;
-  width: 100%;
-  font-family: "Microsoft YaHei", sans-serif;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.search-options {
-  margin-top: 12px;
-  animation: slideDown 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
-  opacity: 0;
-  transform-origin: top;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.search-option-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-  transition: all 0.3s ease;
-}
-
-.option-label {
-  width: 60px;
-  font-size: 14px;
-  color: #6A6A6A;
-  transition: all 0.3s ease;
-}
-
-.option-input {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.option-input input {
-  width: 100%;
-  background: #fff;
-  border: none;
-  border-radius: 16px;
-  padding: 8px 32px 8px 12px;
-  font-size: 14px;
-  outline: none;
-  transition: all 0.3s ease;
-}
-
-.clear-icon {
-  position: absolute;
-  right: 8px;
-  color: #ccc;
-  font-size: 16px;
-  transition: all 0.3s ease;
-}
-
-/* 其他样式保持不变 */
-.news-section {
+  justify-content: space-between;
   margin-bottom: 24px;
 }
 
-.news-card {
-  background-color: #D9D9D9;
+.action-card {
+  background-color: #fff;
   border-radius: 8px;
-  padding: 16px;
-  min-height: 150px;
+  border: 1px solid #D9D9D9;
+  width: calc(33.333% - 10px);
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #F2EEE8;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #D9D9D9;
-  width: 100%;
-  box-sizing: border-box;
+  margin-bottom: 8px;
 }
 
-.news-title {
+.action-title {
+  font-size: 14px;
   color: #6A6A6A;
-  font-size: 16px;
+  font-weight: 500;
 }
 
 .section-title {
@@ -837,5 +745,18 @@ const goToDetail = (id: number) => {
   border-radius: 4px;
   height: 16px;
   margin-top: 8px;
+}
+
+/* 滚动条样式调整 */
+:deep(.van-notice-bar__wrap) {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+:deep(.van-notice-bar__content) {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6A6A6A;
 }
 </style>
