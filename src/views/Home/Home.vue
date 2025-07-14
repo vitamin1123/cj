@@ -196,15 +196,9 @@ import apiClient from '@/plugins/axios';
 import { useLikeStore } from '@/store/likeStore';
 import { usePaymentStore } from '@/store/paymentStore'; 
 import { triggerWechatLogin } from '@/utils/authUtils'; 
-// 导入图标
-import homeIcon from '@/assets/icons/home.svg';
-import homeSelectedIcon from '@/assets/icons/home-selected.svg';
-import compassIcon from '@/assets/icons/compass.svg';
-import compassSelectedIcon from '@/assets/icons/compass-selected.svg';
-import likeIcon from '@/assets/icons/like.svg';
-import likeSelectedIcon from '@/assets/icons/like-selected.svg';
-import smileIcon from '@/assets/icons/smile.svg';
-import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
+
+
+import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
 
 const exploreStore = useExploreStore();
 const userStore = useUserInfoStore()
@@ -306,6 +300,24 @@ const initializeUserData = async () => {
   }
 };
 
+const fetchDynamicMenu = async () => {
+  try {
+    if (!authStore.token) return [];
+    
+    const response = await apiClient.get('/api/menu');
+    return response.data.menuItems.map((item: any) => ({
+      id: item.id,
+      label: item.label,
+      iconType: item.iconType, // 保留类型标识
+      to: item.to,
+      requiredPermission: item.requiredPermission || null
+    }));
+  } catch (error) {
+    console.error('获取动态菜单失败:', error);
+    return [];
+  }
+}
+
 onMounted(async() => {
   exploreStore.loadState();
   await checkAuth();
@@ -313,6 +325,8 @@ onMounted(async() => {
   await fetchInter()
   // console.log('authStore.token: ',authStore.token)
   if (authStore.token) {
+    const dynamicTabs = await fetchDynamicMenu()
+    authStore.setMenuItems(dynamicTabs)
     // 检查支付状态（如果尚未加载）
     if (!paymentStore.isPaid && !paymentStore.loading) {
       try {
@@ -321,7 +335,8 @@ onMounted(async() => {
         console.error('支付状态检查失败:', error);
       }
     }
-    
+    console.log('tabs: ',tabs.value)
+
     // 如果已支付，立即初始化用户数据
     if (paymentStore.isPaid) {
       await initializeUserData();
@@ -347,36 +362,7 @@ const handleAction = (type: string) => {
   }
 };
 
-const tabs = [
-  { 
-    id: 'home', 
-    label: '首页', 
-    icon: homeIcon,
-    iconSelected: homeSelectedIcon,
-    to: '/home'
-  },
-  { 
-    id: 'explore', 
-    label: '寻觅', 
-    icon: compassIcon,
-    iconSelected: compassSelectedIcon,
-    to: '/explore'
-  },
-  { 
-    id: 'likes', 
-    label: '喜欢', 
-    icon: likeIcon,
-    iconSelected: likeSelectedIcon,
-    to: '/likes'
-  },
-  { 
-    id: 'profile', 
-    label: '个人', 
-    icon: smileIcon,
-    iconSelected: smileSelectedIcon,
-    to: '/userCenter'
-  }
-];
+const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 
 const handleTabClick = (tab: any) => {
   if (tab.to) {

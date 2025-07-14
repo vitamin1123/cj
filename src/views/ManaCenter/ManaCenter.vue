@@ -80,15 +80,22 @@
         </div>
       </div>
     </div>
+    <TabBar 
+      :active-tab="activeTab" 
+      @update:active-tab="activeTab = $event"
+      :tabs="tabs"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import * as echarts from 'echarts/core';
 import type { EChartsCoreOption } from 'echarts/core';
 import { LineChart } from 'echarts/charts'; // 改为LineChart
+import { useAuthStore } from '@/store/authStore';
+import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
 import { 
   GridComponent, 
   TooltipComponent, 
@@ -109,6 +116,9 @@ echarts.use([
 
 const router = useRouter();
 
+const activeTab = ref('manacenter');
+const authStore = useAuthStore();
+const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 // 登录图表引用
 const loginChart = ref<HTMLDivElement | null>(null);
 

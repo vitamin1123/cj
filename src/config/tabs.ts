@@ -1,11 +1,13 @@
-import homeIcon from '@/assets/tabbar/home.png';
-import homeSelectedIcon from '@/assets/tabbar/home_selected.png';
-import compassIcon from '@/assets/tabbar/compass.png';
-import compassSelectedIcon from '@/assets/tabbar/compass_selected.png';
-import likeIcon from '@/assets/tabbar/like.png';
-import likeSelectedIcon from '@/assets/tabbar/like_selected.png';
-import smileIcon from '@/assets/tabbar/smile.png';
-import smileSelectedIcon from '@/assets/tabbar/smile_selected.png';
+import homeIcon from '@/assets/icons/home.svg';
+import homeSelectedIcon from '@/assets/icons/home-selected.svg';
+import compassIcon from '@/assets/icons/compass.svg';
+import compassSelectedIcon from '@/assets/icons/compass-selected.svg';
+import likeIcon from '@/assets/icons/like.svg';
+import likeSelectedIcon from '@/assets/icons/like-selected.svg';
+import smileIcon from '@/assets/icons/smile.svg';
+import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
+import manaIcon from '@/assets/icons/mana.svg';
+import manaSelectedIcon from '@/assets/icons/mana-selected.svg';
 
 // 所有可能的标签配置
 export const ALL_TABS = [
@@ -43,5 +45,35 @@ export const ALL_TABS = [
   }
 ] as const;
 
+export const ICON_MAP = {
+  mana: {
+    default: manaIcon,
+    selected: manaSelectedIcon
+  },
+  // 添加其他图标类型...
+} as const;
+
+export type StaticTabId = typeof ALL_TABS[number]['id']; // "home" | "explore" | "likes" | "profile"
+
+export interface DynamicTabItem {
+  id: string; // 允许任意字符串
+  label: string;
+  iconType: IconType;
+  to: string;
+  requiredPermission?: string;
+}
+
+
 // 类型导出
-export type TabItem = typeof ALL_TABS[number];
+export type TabItem = 
+  | typeof ALL_TABS[number] // 静态菜单项
+  | { // 动态菜单项
+      id: string;
+      label: string;
+      icon: string;
+      iconSelected: string;
+      to: string;
+      requiredPermission?: string;
+    };
+
+export type IconType = keyof typeof ICON_MAP

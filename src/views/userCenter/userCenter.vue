@@ -114,20 +114,14 @@ import { ref, nextTick, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Toast, showToast, showLoadingToast, closeToast  } from 'vant';
 import apiClient from '@/plugins/axios';
+import { useAuthStore } from '@/store/authStore';
 import { useUserInfoStore } from '@/store/userinfo';
 import { useLikeStore } from '@/store/likeStore';
 import TabBar from '@/components/TabBar.vue';
 import Compressor from 'compressorjs';
 
 // 导入图标
-import homeIcon from '@/assets/icons/home.svg';
-import homeSelectedIcon from '@/assets/icons/home-selected.svg';
-import compassIcon from '@/assets/icons/compass.svg';
-import compassSelectedIcon from '@/assets/icons/compass-selected.svg';
-import likeIcon from '@/assets/icons/like.svg';
-import likeSelectedIcon from '@/assets/icons/like-selected.svg';
-import smileIcon from '@/assets/icons/smile.svg';
-import smileSelectedIcon from '@/assets/icons/smile-selected.svg';
+import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
 
 // 定义 MenuItem 接口
 interface MenuItem {
@@ -147,6 +141,7 @@ interface User {
 const userInfoStore = useUserInfoStore();
 const likeStore = useLikeStore();
 const activeTab = ref('profile');
+const authStore = useAuthStore();
 const router = useRouter();
 const avatarInput = ref<HTMLInputElement>();
 const nicknameInput = ref<HTMLInputElement>();
@@ -542,36 +537,7 @@ const menuItems = ref<MenuItem[]>([
   { id: 'mana', label: '管理', route: '/mana'},
 ]);
 
-const tabs = [
-  { 
-    id: 'home', 
-    label: '首页', 
-    icon: homeIcon,
-    iconSelected: homeSelectedIcon,
-    to: '/home'
-  },
-  { 
-    id: 'explore', 
-    label: '寻觅', 
-    icon: compassIcon,
-    iconSelected: compassSelectedIcon,
-    to: '/explore'
-  },
-  { 
-    id: 'likes', 
-    label: '喜欢', 
-    icon: likeIcon,
-    iconSelected: likeSelectedIcon,
-    to: '/likes'
-  },
-  { 
-    id: 'profile', 
-    label: '个人', 
-    icon: smileIcon,
-    iconSelected: smileSelectedIcon,
-    to: '/userCenter'
-  }
-];
+const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 
 </script>
 
