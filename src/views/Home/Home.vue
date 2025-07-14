@@ -83,13 +83,13 @@
           <div class="action-icon">
             <van-icon name="contact" size="24" color="#6A6A6A" />
           </div>
-          <div class="action-title">联系红娘</div>
+          <div class="action-title">联系陈姐</div>
         </div>
         <div class="action-card" @click="handleAction('link')">
           <div class="action-icon">
             <van-icon name="link-o" size="24" color="#6A6A6A" />
           </div>
-          <div class="action-title">外部链接</div>
+          <div class="action-title">陈姐的抖音</div>
         </div>
         <div class="action-card" @click="handleAction('reward')">
           <div class="action-icon">

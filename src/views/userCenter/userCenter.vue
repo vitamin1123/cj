@@ -5,15 +5,19 @@
       <!-- 顶部卡片 -->
       <div class="profile-card">
         <div class="profile-content">
-          <div class="avatar-wrapper" @click="editAvatar">
+          <div class="avatar-wrapper" @click="handleAvatarClick" :class="{ 'disabled-avatar': !paymentStore.isPaid }">
             <div class="avatar" :style="{ backgroundImage: `url(${user.avatarUrl})` }">
               <div v-if="!user.avatarUrl" class="avatar-placeholder">+</div>
             </div>
-            <!-- <div class="edit-hint">点击编辑</div> -->
+            <!-- <div v-if="!paymentStore.isPaid" class="edit-hint">升级会员解锁</div>
+            <div v-else class="edit-hint">点击编辑</div> -->
           </div>
           <div class="profile-info">
             <div class="nickname-container">
-              <div v-if="!isEditingNickname" class="nickname" @click="editNickname">{{ user.nickname }}</div>
+              <div v-if="!isEditingNickname" class="nickname" :class="{ 'disabled-nickname': !paymentStore.isPaid }"
+                @click="handleNicknameClick">
+                {{ user.nickname }}
+              </div>
               <div v-else class="nickname-edit">
                 <input 
                   v-model="tempNickname" 
@@ -119,6 +123,7 @@ import { useUserInfoStore } from '@/store/userinfo';
 import { useLikeStore } from '@/store/likeStore';
 import TabBar from '@/components/TabBar.vue';
 import Compressor from 'compressorjs';
+import { usePaymentStore } from '@/store/paymentStore'; 
 
 // 导入图标
 import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
@@ -137,7 +142,7 @@ interface User {
   avatarUrl?: string; // 可选的头像URL
   recentVisitorsCount: number;
 }
-
+const paymentStore = usePaymentStore();
 const userInfoStore = useUserInfoStore();
 const likeStore = useLikeStore();
 const activeTab = ref('profile');
@@ -172,6 +177,23 @@ const user = computed(() => {
     avatarUrl: avatar ? 'avatars/' + avatar : defaultAvatar,
   };
 });
+const handleNicknameClick = () => {
+  if (!paymentStore.isPaid) {
+    // 未付费时显示提示信息
+    showToast('请升级会员解锁编辑功能');
+    return;
+  }
+  editNickname();
+};
+
+const handleAvatarClick = () => {
+  if (!paymentStore.isPaid) {
+    // 未付费时显示提示信息
+    showToast('请升级会员解锁头像编辑功能');
+    return;
+  }
+  editAvatar();
+};
 
 // 监听用户照片变化
 watch(() => userInfoStore.profile?.photo, (newPhoto) => {
@@ -531,17 +553,38 @@ const savePhotos = async () => {
   }
 };
 
-const menuItems = ref<MenuItem[]>([
-  { id: 'profile-maintenance', label: '资料维护', route: '/profile-setup' },
-  { id: 'photos', label: '我的照片', action: () => showPhotoPopup.value = true },
-  { id: 'mana', label: '管理', route: '/mana'},
-]);
+// const menuItems = ref<MenuItem[]>([
+//   { id: 'profile-maintenance', label: '资料维护', route: '/profile-setup' },
+//   { id: 'photos', label: '我的照片', action: () => showPhotoPopup.value = true },
+
+// ]);
+const menuItems = computed<MenuItem[]>(() => {
+  const items: MenuItem[] = [
+    { id: 'profile-maintenance', label: '资料登记', route: '/profile-setup' }
+  ];
+  
+  // 仅当用户已付费时才显示"我的照片"选项
+  if (paymentStore.isPaid) {
+    items.push({ 
+      id: 'photos', 
+      label: '我的照片', 
+      action: () => showPhotoPopup.value = true 
+    });
+  }
+  
+  return items;
+});
 
 const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 
 </script>
 
 <style scoped>
+
+.disabled-nickname {
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
 .user-center-container {
   background-color: #F2EEE8;
   min-height: 100vh;

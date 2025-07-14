@@ -48,7 +48,7 @@
       <h2 class="section-title">管理</h2>
       <div class="menu-cards">
         <!-- 用户管理 -->
-        <div class="menu-card" @click="navigateTo('users')">
+        <div class="menu-card" @click="navigateTo('mana')">
           <div class="menu-icon">
             <van-icon name="friends-o" size="24" color="#6A6A6A" />
           </div>
@@ -73,10 +73,15 @@
         
         <!-- 内容审核 -->
         <div class="menu-card" @click="navigateTo('moderation')">
+          <div class="menu-icon-container">
           <div class="menu-icon">
-            <van-icon name="todo-list-o" size="24" color="#6A6A6A" />
+            
+              <van-icon name="todo-list-o" size="24" color="#6A6A6A" />
+            
           </div>
-          <div class="menu-title">内容审核</div>
+          <van-badge :content="manaStore.pendingAudit || ''" class="audit-badge"></van-badge>
+          </div>
+          <div class="menu-title">信息审核</div>
         </div>
       </div>
     </div>
@@ -95,6 +100,7 @@ import * as echarts from 'echarts/core';
 import type { EChartsCoreOption } from 'echarts/core';
 import { LineChart } from 'echarts/charts'; // 改为LineChart
 import { useAuthStore } from '@/store/authStore';
+import { useManaStore } from '@/store/manaStore'
 import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
 import { 
   GridComponent, 
@@ -103,7 +109,7 @@ import {
   LegendComponent
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-
+const manaStore = useManaStore()
 // 注册ECharts组件
 echarts.use([
   LineChart, // 使用折线图
@@ -223,16 +229,46 @@ const initLoginChart = () => {
 
 // 导航到指定页面
 const navigateTo = (route: string) => {
-  router.push(`/mana/${route}`);
+  router.replace(`/${route}`);
 };
 
 // 组件挂载后初始化图表
 onMounted(() => {
   initLoginChart();
+  manaStore.fetchPendingAudit();
 });
 </script>
 
 <style scoped>
+
+.menu-icon-container {
+  position: relative;
+  display: inline-block; /* 改为行内块元素 */
+  margin-bottom: 8px;
+}
+
+.audit-badge {
+  position: absolute;
+  top: -5px; /* 向上移动减少距离 */
+  right: -5px; /* 向右移动减少距离 */
+  z-index: 10;
+  transform: scale(1.1); /* 稍微缩小徽章尺寸 */
+}
+
+/* 调整van-badge位置 */
+:deep(.van-badge) {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+}
+
+/* 当数量为0时隐藏徽标 */
+:deep(.van-badge--content.van-badge__content.van-badge__content--fixed) {
+  display: block;
+}
+:deep(.van-badge__content.van-badge__content--fixed[data-v-xxxx]:empty) {
+  display: none;
+}
 .mana-container {
   background-color: #F2EEE8;
   min-height: 100vh;
@@ -380,8 +416,9 @@ onMounted(() => {
   justify-content: center;
   margin-bottom: 8px;
   /* 添加以下属性确保完美圆形 */
-  overflow: hidden; /* 防止内容溢出 */
+  overflow: hidden; 
   flex-shrink: 0; /* 防止在flex容器中变形 */
+  position: relative;
 }
 
 /* 菜单标题 */

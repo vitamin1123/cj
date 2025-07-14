@@ -147,6 +147,46 @@
         </div>
       </van-swipe-item>
 
+      <!-- 第5步：婚姻状况 -->
+    <van-swipe-item>
+  <div class="setup-card">
+    <div class="card-icon">💍</div>
+    <h2 class="card-title">婚姻状况</h2>
+    <p class="card-subtitle">请选择你的婚姻状态</p>
+    <div class="marital-toggle">
+      <span :class="{ active: formData.married === 0 }">未婚</span>
+      <van-switch
+        v-model="formData.married"
+        :active-value="1"
+        :inactive-value="0"
+        size="24px"
+        active-color="#D75670"
+      />
+      <span :class="{ active: formData.married === 1 }">已婚</span>
+    </div>
+  </div>
+</van-swipe-item>
+
+<!-- 第6步：孩子状况（仅当已婚时显示） -->
+<van-swipe-item v-if="showChildrenStep">
+  <div class="setup-card">
+    <div class="card-icon">👶</div>
+    <h2 class="card-title">孩子状况</h2>
+    <p class="card-subtitle">你有孩子吗？</p>
+    <div class="children-toggle">
+      <span :class="{ active: formData.child === 0 }">没有孩子</span>
+      <van-switch
+        v-model="formData.child"
+        :active-value="1"
+        :inactive-value="0"
+        size="24px"
+        active-color="#D75670"
+      />
+      <span :class="{ active: formData.child === 1 }">有孩子</span>
+    </div>
+  </div>
+</van-swipe-item>
+
       <!-- 地区 -->
       <van-swipe-item>
         <div class="setup-card">
@@ -313,11 +353,11 @@
           <div class="card-icon">📝</div>
           <h2 class="card-title">个人简介</h2>
           <p class="card-subtitle">介绍一下自己吧</p>
-          <div class="textarea-container">
+          <div class="textarea-container bio-container">
             <textarea 
               v-model="formData.bio" 
               placeholder="写一段简短的自我介绍..."
-              class="setup-textarea"
+              class="setup-textarea bio-textarea"
               maxlength="200"
             ></textarea>
             <div class="char-count">{{ formData.bio.length }}/200</div>
@@ -331,11 +371,11 @@
           <div class="card-icon">🔒</div>
           <h2 class="card-title">隐私简介</h2>
           <p class="card-subtitle">只有陈姐能看到</p>
-          <div class="textarea-container">
+          <div class="textarea-container private-bio-container">
             <textarea 
               v-model="formData.privateBio" 
               placeholder="写一些更私密的信息..."
-              class="setup-textarea"
+              class="setup-textarea private-textarea"
               maxlength="200"
             ></textarea>
             <div class="char-count">{{ formData.privateBio.length }}/200</div>
@@ -378,7 +418,7 @@ const userStore = useUserInfoStore()
 const router = useRouter();
 const swipeRef = ref();
 const currentStep = ref(1);
-const totalSteps = 13;
+const totalSteps = 15;
 const showDatePicker = ref(false);
 const dateValue = ref(new Date());
 
@@ -413,8 +453,24 @@ const formData = ref({
   mbti: '',
   phone: '',
   bio: '',
-  privateBio: ''
+  privateBio: '',
+  married: 0,
+  child: 0
 });
+
+const showChildrenStep = computed(() => {
+  return formData.value.married === 1;
+});
+
+// 设置婚姻状况并处理逻辑
+const setMaritalStatus = (status: 0 | 1) => {
+  formData.value.married = status;
+  
+  // 如果选择未婚，自动设置没有孩子
+  if (status === 0) {
+    formData.value.child = 0;
+  }
+};
 
 watch(currentStep, (newVal) => {
   // 当currentStep变化时，更新swipe位置
@@ -526,15 +582,17 @@ const canProceed = computed(() => {
     case 2: return formData.value.birthDate !== null;
     case 3: return formData.value.height !== '' && heightValidator(formData.value.height);
     case 4: return formData.value.weight !== '' && weightValidator(formData.value.weight);
-    case 5: return formData.value.region !== '';
-    case 6: return formData.value.occupation !== '';
-    case 7: return formData.value.income !== '';
-    case 8: return formData.value.education !== '';
-    case 9: return true; // 信仰可选
-    case 10: return true; // MBTI可选
-    case 11: return formData.value.phone !== '' && phoneValidator(formData.value.phone); // 手机号必填且格式正确
-    case 12: return true; // 简介可选
-    case 13: return true; // 隐私简介可选
+    case 5: return formData.value.married < 2; // 婚姻状况必选
+    case 6: return formData.value.child < 2; // 孩子状况必选
+    case 7: return formData.value.region !== '';
+    case 8: return formData.value.occupation !== '';
+    case 9: return formData.value.income !== '';
+    case 10: return formData.value.education !== '';
+    case 11: return true; // 信仰可选
+    case 12: return true; // MBTI可选
+    case 13: return formData.value.phone !== '' && phoneValidator(formData.value.phone); // 手机号必填且格式正确
+    case 14: return true; // 简介可选
+    case 15: return true; // 隐私简介可选
     default: return false;
   }
 });
@@ -549,14 +607,24 @@ const nextStep = () => {
     submitForm();
   } else {
     // swipeRef.value?.next();
-    currentStep.value++;
+    // currentStep.value++;
+    if (currentStep.value === 5 && formData.value.married === 0) {
+        currentStep.value += 2; // 直接跳到第7步
+      } else {
+        currentStep.value++;
+      }
     swipeRef.value?.swipeTo(currentStep.value - 1);
   }
 };
 
 const prevStep = () => {
 //   swipeRef.value?.prev();
-currentStep.value--;
+//    currentStep.value--;
+if (currentStep.value === 7 && formData.value.married === 0) {
+    currentStep.value = 5; // 回退到婚姻状况步骤
+  } else {
+    currentStep.value--;
+  }
   swipeRef.value?.swipeTo(currentStep.value - 1);
 };
 
@@ -572,6 +640,8 @@ const submitForm = async () => {
       occupation: formData.value.occupation,
       income_level: formData.value.income,
       education: formData.value.education,
+      married: formData.value.married,
+      child: formData.value.child,
       religion: formData.value.religion,
       mbti: formData.value.mbti,
       phone: formData.value.phone,
@@ -719,6 +789,29 @@ onMounted(() => {
 </script>
 
 <style scoped>
+
+
+/* 个人简介和隐私简介文本域调整 */
+.bio-container,
+.private-bio-container {
+  max-width: 100% !important; /* 填满可用空间 */
+  width: 100%;
+}
+
+.bio-textarea,
+.private-textarea {
+  min-height: 180px !important; /* 增加高度 */
+  width: 100%; /* 填满容器 */
+  padding: 20px; /* 增加内边距 */
+  font-size: 16px; /* 增大字体 */
+}
+
+.char-count {
+  position: absolute;
+  bottom: 15px; /* 调整位置 */
+  right: 15px; /* 调整位置 */
+  font-size: 14px; /* 增大字体 */
+}
 .profile-setup-container {
   background-color: #F2EEE8;
   min-height: 100vh;
@@ -1400,4 +1493,40 @@ onMounted(() => {
   color: white;
   font-size: 20px;
 }
+
+.marital-toggle, .children-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.marital-toggle span, .children-toggle span {
+  font-size: 16px;
+  font-weight: 500;
+  color: #999;
+  transition: color 0.3s;
+}
+
+.marital-toggle span.active, .children-toggle span.active {
+  color: #D75670;
+  font-weight: 600;
+}
+
+/* 自定义Switch样式 */
+:deep(.van-switch) {
+  background-color: #E0E0E0;
+  border: 1px solid #E0E0E0;
+}
+
+:deep(.van-switch__node) {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+:deep(.van-switch--on) {
+  background-color: rgba(215, 86, 112, 0.2);
+}
+
 </style>
