@@ -56,6 +56,12 @@ const router = createRouter({
       meta: { title: '个人中心' }
     },
     {
+      path: '/chat',
+      name: 'Chat',
+      component: () => import('@/views/Chat/Chat.vue'),
+      meta: { title: '聊天' }
+    },
+    {
       path: '/detail/:id',
       name: 'detail',
       component: () => import('@/views/Detail/Detail.vue'),
@@ -127,7 +133,7 @@ router.beforeEach(async (to, from, next) => {
   const fullUrl = `${window.location.origin}${to.fullPath}`
   urlStore.updateCurrentUrl(fullUrl)
   // 允许访问的白名单路由
-  const publicRoutes = ['/reopen', '/auth-success', '/404', '/payment', '/home','/userCenter'];
+  const publicRoutes = ['/reopen', '/auth-success', '/404', '/payment', '/home','/userCenter','/profile-setup'];
   
   if (publicRoutes.includes(to.path)) {
     return next();

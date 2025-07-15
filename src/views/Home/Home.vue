@@ -79,21 +79,22 @@
 
       <!-- 三个功能卡片 -->
       <div class="action-cards">
-        <div class="action-card" @click="handleAction('contact')">
+        <div class="action-card" @click="goToChat">
           <div class="action-icon">
-            <van-icon name="contact" size="24" color="#6A6A6A" />
+            <van-icon name="service" size="24" color="#6A6A6A" />
           </div>
           <div class="action-title">联系陈姐</div>
         </div>
         <div class="action-card" @click="handleAction('link')">
           <div class="action-icon">
-            <van-icon name="link-o" size="24" color="#6A6A6A" />
+            <van-icon name="wechat-moments" size="24" color="#6A6A6A" />
           </div>
           <div class="action-title">陈姐的抖音</div>
         </div>
         <div class="action-card" @click="handleAction('reward')">
           <div class="action-icon">
-            <van-icon name="cash-back-record" size="24" color="#6A6A6A" />
+            <van-icon name="point-gift
+" size="24" color="#6A6A6A" />
           </div>
           <div class="action-title">打赏</div>
         </div>
@@ -234,6 +235,10 @@ const getBirthYear = (birthDate: string) => {
 const truncateMemo = (text: string, maxLength: number) => {
   if (!text) return '';
   return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+};
+
+const goToChat = () => {
+  router.replace('/chat');
 };
 
 const checkAuth = async () => {
