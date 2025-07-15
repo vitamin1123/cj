@@ -7,7 +7,7 @@
         <img :src="adminAvatar" alt="陈姐头像" class="admin-avatar" />
         <div>
           <div class="admin-name">陈姐</div>
-          <div class="status">在线</div>
+          <!-- <div class="status">在线</div> -->
         </div>
       </div>
     </div>
@@ -188,7 +188,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  background-color: #4f8ef7;
+  background-color: rgb(216, 127, 194);
   color: white;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   position: relative;
@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
 }
 
 .message.sent .message-content {
-  background-color: #4f8ef7;
+  background-color: #e298d7;
   color: white;
   border-top-right-radius: 4px;
 }

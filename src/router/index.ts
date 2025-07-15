@@ -109,6 +109,12 @@ const router = createRouter({
       meta: { title: '管理' }
     },
     {
+      path: '/adminchat',
+      name: 'adminchat',
+      component: () => import('@/views/AdminChat/AdminChat.vue'),
+      meta: { title: '沟通' }
+    },
+    {
       path: '/mana',
       name: 'mana',
       component: () => import('@/views/Mana/Mana.vue'),

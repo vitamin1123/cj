@@ -83,6 +83,20 @@
           </div>
           <div class="menu-title">信息审核</div>
         </div>
+
+        <div class="menu-card" @click="navigateTo('adminchat')">
+          <div class="menu-icon-container">
+          <div class="menu-icon">
+            
+              <van-icon name="chat-o" size="24" color="#6A6A6A" />
+            
+          </div>
+          <van-badge :content="manaStore.pendingAudit || ''" class="audit-badge"></van-badge>
+          </div>
+          <div class="menu-title">用户沟通</div>
+        </div>
+
+
       </div>
     </div>
     <TabBar 
@@ -244,7 +258,7 @@ onMounted(() => {
 .menu-icon-container {
   position: relative;
   display: inline-block; /* 改为行内块元素 */
-  margin-bottom: 8px;
+  margin-bottom: 0px;
 }
 
 .audit-badge {
