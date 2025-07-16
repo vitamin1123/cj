@@ -1,5 +1,6 @@
 <template>
   <div class="chat-container">
+    
     <!-- 顶部导航栏 -->
     <div class="chat-header">
       <van-icon name="arrow-left" class="back-icon" @click="goBack" />
@@ -89,6 +90,8 @@ import dayjs from 'dayjs';
 import sendIcon from '@/assets/icons/send.svg';
 import { showFailToast } from 'vant';
 import { v4 as uuidv4 } from 'uuid';
+
+
 
 const showRevokeConfirm = ref(false);
 const selectedMessage = ref<any>(null);
@@ -252,7 +255,7 @@ const formatTime = (time: Date) => {
 
 // 返回上一页
 const goBack = () => {
-  router.back();
+  router.replace('/home')
 };
 
 // 添加撤回消息函数

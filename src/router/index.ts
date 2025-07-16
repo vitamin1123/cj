@@ -115,6 +115,18 @@ const router = createRouter({
       meta: { title: '沟通' }
     },
     {
+      path: '/moderation',
+      name: 'moderation',
+      component: () => import('@/views/Moderation/Moderation.vue'),
+      meta: { title: '审核' }
+    },
+    {
+      path: '/moderation-detail/:id',
+      name: 'moderation-detail',
+      component: () => import('@/views/ModerationDetail/ModerationDetail.vue'),
+      meta: { title: '审核明细' }
+    },
+    {
       path: '/mana',
       name: 'mana',
       component: () => import('@/views/Mana/Mana.vue'),

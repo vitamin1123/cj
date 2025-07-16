@@ -18,7 +18,7 @@
         <!-- 最近注册人数 -->
         <div class="stat-card small">
           <div class="stat-header">
-            <van-icon name="new-arrival-o" size="14" color="#6A6A6A" />
+            <van-icon name="records-o" size="14" color="#6A6A6A" />
             <span class="stat-title">最近注册人数</span>
           </div>
           <div class="stat-value">248</div>

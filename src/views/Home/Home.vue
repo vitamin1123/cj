@@ -85,12 +85,40 @@
           </div>
           <div class="action-title">联系陈姐</div>
         </div>
-        <div class="action-card" @click="handleAction('link')">
+
+        <div ref="qrTriggerRef" class="action-card" @click="showQR = true">
           <div class="action-icon">
-            <van-icon name="wechat-moments" size="24" color="#6A6A6A" />
+            <van-icon name="contact" size="24" color="#6A6A6A" />
           </div>
-          <div class="action-title">陈姐的抖音</div>
+          <div class="action-title">抖音/微信</div>
+          <van-popover
+  v-model:show="showQR"
+  :reference="qrTriggerRef"
+  placement="bottom"
+  :offset="[0, 12]"
+  class="qr-popover"
+>
+  <div class="qr-panel">
+    <van-swipe
+      :loop="false"
+      :autoplay="0"
+      indicator-color="transparent"
+      style="width: 220px"
+    >
+      <van-swipe-item class="qr-item">
+        <img class="qr-img" :src="douyinQr" />
+        <span class="qr-label">抖音：天顺婚介</span>
+      </van-swipe-item>
+
+      <van-swipe-item class="qr-item">
+        <img class="qr-img" :src="wechatQr" />
+        <span class="qr-label">微信：陈姐</span>
+      </van-swipe-item>
+    </van-swipe>
+  </div>
+</van-popover>
         </div>
+
         <div class="action-card" @click="handleAction('reward')">
           <div class="action-icon">
             <van-icon name="point-gift
@@ -182,6 +210,7 @@
       :tabs="tabs"
     />
   </div>
+  <RewardPopup v-model="showRewardPopup" />
 </template>
 
 <script setup lang="ts">
@@ -197,9 +226,14 @@ import apiClient from '@/plugins/axios';
 import { useLikeStore } from '@/store/likeStore';
 import { usePaymentStore } from '@/store/paymentStore'; 
 import { triggerWechatLogin } from '@/utils/authUtils'; 
-
-
+import douyinQr from '@/assets/images/douyin_qr.png';
+import wechatQr from '@/assets/images/wechat_qr.png';
+import RewardPopup from '@/components/RewardPopup.vue';
 import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
+
+const showRewardPopup = ref(false);
+const showQR   = ref(false);
+const qrTriggerRef = ref<HTMLElement | null>(null);
 
 const exploreStore = useExploreStore();
 const userStore = useUserInfoStore()
@@ -362,6 +396,7 @@ const handleAction = (type: string) => {
       break;
     case 'reward':
       // 打赏逻辑
+      showRewardPopup.value = true;
       console.log('打赏');
       break;
   }
@@ -749,5 +784,48 @@ const goToDetail = (id: number) => {
   font-size: 14px;
   font-weight: 500;
   color: #6A6A6A;
+}
+
+/* Popover 外壳颜色、圆角与首页卡片一致 */
+.qr-popover {
+  --van-popover-background: #FFFFFF;
+  --van-popover-border-radius: 8px;
+  --van-popover-padding: 0;
+}
+
+.qr-popover.van-popover--bottom {
+  /* 保证水平居中 */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin-top: 12px;            /* 与触发按钮的距离 */
+}
+
+/* 面板 */
+.qr-panel {
+  width: 260px;
+  padding: 20px;
+  background: #FFFFFF;
+  border-radius: 12px;
+}
+
+/* 每个 Swipe 项 */
+.qr-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qr-img {
+  width: 200px;
+  height: 300px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.qr-label {
+  display: block;
+  margin-top: 10px;
+  font-size: 15px;
+  color: #6A6A6A;
+  text-align: center;
 }
 </style>

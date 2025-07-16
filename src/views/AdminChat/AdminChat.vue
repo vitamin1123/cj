@@ -1,5 +1,15 @@
 <template>
   <div class="admin-chat-container">
+    <van-floating-bubble
+      v-model:offset="offset"
+      axis="xy"
+      magnetic="x"
+      icon="revoke"
+      :size="54"
+      :gap="10"
+      @click="goBack"
+      style="--van-floating-bubble-background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);"
+    />
     <!-- 侧边栏 - 用户列表 -->
     <div class="sidebar" :class="{ 'collapsed': selectedChat }">
       <div class="sidebar-header">
@@ -172,9 +182,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useWebSocket } from '@vueuse/core';
+import { useRouter, useRoute  } from 'vue-router';
+import { getPreviousRoute } from '@/utils/routeHistory';
 import dayjs from 'dayjs';
 import apiClient from '@/plugins/axios';
 import { v4 as uuidv4 } from 'uuid';
+
 import { 
   Image as VanImage, 
   Icon, 
@@ -193,7 +206,7 @@ import { fetchActiveChats, fetchChatHistory, markMessagesRead } from '@/api/chat
 import { useAuthStore } from '@/store/authStore';
 
 const authStore = useAuthStore();
-
+const router = useRouter();
 // 聊天数据
 const activeChats = ref<any[]>([]);
 const filteredChats = ref<any[]>([]);
@@ -208,7 +221,7 @@ const showActions = ref(false);
 const showRevokeConfirm = ref(false);
 const selectedMessage = ref<any>(null);
 let longPressTimer: number | null = null;
-
+const offset = ref({ x: 0.05 * window.innerWidth, y: 0.03 * window.innerHeight });
 // 日期处理
 const today = ref(new Date());
 
@@ -357,6 +370,15 @@ const closeChat = () => {
   selectedChat.value = null;
   selectedChatId.value = null;
   messages.value = [];
+};
+
+const goBack = () => {
+  const previousRoute = getPreviousRoute();
+  if (previousRoute) {
+    router.replace({ path: previousRoute.path, query: previousRoute.query, params: previousRoute.params });
+  } else {
+    router.replace('/home');
+  }
 };
 
 // 监听WebSocket消息
