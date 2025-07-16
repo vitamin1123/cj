@@ -27,13 +27,15 @@
     
     <!-- 输入区域 -->
     <div class="input-container">
-      <input 
-        v-model="newMessage" 
-        type="text" 
-        placeholder="输入消息..."
-        @keyup.enter="sendMessage"
-        class="message-input"
-      />
+      <van-field
+          v-model="newMessage"
+          type="textarea"
+          rows="1"
+          autosize
+          placeholder="输入消息..."
+          @keyup.enter="sendMessage"
+          class="message-input"
+        />
       <van-button
       @click="sendMessage"
       class="send-button"
@@ -52,6 +54,7 @@ import { useWebSocket } from '@vueuse/core';
 import { useRouter } from 'vue-router';
 import { useUserInfoStore } from '@/store/userinfo';
 import { useAuthStore } from '@/store/authStore';
+import apiClient from '@/plugins/axios';
 import dayjs from 'dayjs';
 import sendIcon from '@/assets/icons/send.svg';
 
@@ -87,6 +90,10 @@ const { data, send, open, close } = useWebSocket(WS_URL, {
 
 // 监听WebSocket消息
 watch(data, (newData) => {
+  if (!newData || typeof newData !== 'string') return;
+
+  // 跳过心跳消息
+  if (newData === 'ping' || newData === 'pong') return;
   if (newData) {
     try {
       const message = JSON.parse(newData);
@@ -151,17 +158,29 @@ const goBack = () => {
 // 加载历史消息
 const loadHistory = async () => {
   try {
-    // 模拟API调用
-    const mockHistory = [
-      { id: 1, text: '您好，我是陈姐，有什么可以帮您的吗？', isSent: false, time: new Date(Date.now() - 3600000) },
-      { id: 2, text: '我想咨询一下会员服务', isSent: true, time: new Date(Date.now() - 3500000) },
-      { id: 3, text: '好的，请描述一下您的需求', isSent: false, time: new Date(Date.now() - 3400000) },
-    ];
-    
-    messages.value = mockHistory;
+    const res = await apiClient.get('/api/user/chat/messages');
+    const data = res.data;
+    // messages.value = data.map((msg: any) => ({
+    //   text: msg.content,
+    //   isSent: msg.is_sent,
+    //   time: new Date(msg.sent_at)
+    // }));
+    if (data && data.length > 0) {
+      messages.value = data.map((msg: any) => ({
+        text: msg.content,
+        isSent: msg.is_sent,
+        time: new Date(msg.sent_at)
+      }));
+    } else {
+      messages.value = [{
+        text: '您好，我是陈姐，有什么可以帮您的吗？',
+        isSent: false,
+        time: new Date()
+      }];
+    }
     scrollToBottom();
-  } catch (error) {
-    console.error('加载历史消息失败', error);
+  } catch (e) {
+    console.error('加载历史消息失败', e);
   }
 };
 

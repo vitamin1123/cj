@@ -22,10 +22,10 @@
         >
           <div class="avatar-container">
             <van-image
-              round
+              radius="8"
               width="48px"
               height="48px"
-              :src="chat.user_avatar || '/default-avatar.png'"
+              :src="'/avatars/'+chat.user_avatar || '/avatars/default-avatar.png'"
               class="user-avatar"
             />
             <van-badge :content="chat.unread_count" v-if="chat.unread_count > 0" />
@@ -60,15 +60,12 @@
               round
               width="40px"
               height="40px"
-              :src="selectedChat.user_avatar || '/default-avatar.png'"
+              :src="'/avatars/'+selectedChat.user_avatar || '/avatars/default-avatar.png'"
               class="admin-avatar"
             />
             <div class="user-details">
               <div class="admin-name">{{ selectedChat.user_nickname }}</div>
-              <div class="status">
-                <van-icon name="certificate" color="#07c160" size="12" />
-                <span>在线</span>
-              </div>
+              
             </div>
           </div>
           <van-icon name="ellipsis" class="menu-icon" @click="showChatActions" />
@@ -89,14 +86,14 @@
           </div>
           
           <div :class="['message', message.isSent ? 'sent' : 'received']">
-            <van-image
+            <!-- <van-image
               v-if="!message.isSent"
               round
               width="36px"
               height="36px"
-              :src="selectedChat.user_avatar || '/default-avatar.png'"
+              :src="'/avatars/'+selectedChat.user_avatar || '/avatars/default-avatar.png'"
               class="message-avatar"
-            />
+            /> -->
             <div class="message-content-container">
               <div class="message-content">
                 {{ message.text }}
@@ -122,11 +119,9 @@
           placeholder="输入回复..."
           @keyup.enter="sendMessage"
           class="message-input"
-        >
-          <template #button>
-            <div class="input-actions">
-              <!-- <van-icon name="smile" class="action-icon" />
-              <van-icon name="photo" class="action-icon" /> -->
+        />
+          
+
               <van-button 
                 round 
                 type="primary" 
@@ -137,9 +132,8 @@
               >
                 发送
               </van-button>
-            </div>
-          </template>
-        </van-field>
+    
+        
       </div>
     </div>
     
@@ -149,9 +143,6 @@
     <van-action-sheet v-model:show="showActions" title="聊天操作">
       <div class="action-sheet-content">
         <van-cell title="查看用户资料" icon="user-o" />
-        <van-cell title="清空聊天记录" icon="delete" />
-        <van-cell title="标记为未读" icon="envelop-o" />
-        <van-cell title="投诉用户" icon="warning-o" />
       </div>
     </van-action-sheet>
   </div>
@@ -247,17 +238,19 @@ const loadActiveChats = async () => {
 
 // 选择聊天会话
 const selectChat = async (chat: any) => {
+  console.log('chat',chat)
   selectedChat.value = chat;
-  selectedChatId.value = chat.id;
+  selectedChatId.value = chat.chat_id;
   newMessage.value = '';
   console.log('看看chat:',chat)
   // 加载历史消息
   try {
     const response = await fetchChatHistory(chat.chat_id);
+    console.log('response',response)
     messages.value = response.data.map((msg: any) => ({
       id: msg.id,
       text: msg.content,
-      isSent: msg.sender_type === 'admin',
+      isSent: msg.sender === 'admin',
       time: new Date(msg.sent_at),
       read: msg.read
     }));
@@ -282,23 +275,23 @@ const closeChat = () => {
 
 // 监听WebSocket消息
 watch(data, (newData) => {
-  if (newData) {
-    try {
-      const message = JSON.parse(newData);
-      
-      // 检查是否是当前选中的聊天
-      if (message.chat_id === selectedChatId.value) {
-        addMessage(message.text, false);
-      } else {
-        // 通知新消息
-        Toast.info(`来自${message.user_name}的新消息`);
-      }
-      
-      // 更新未读消息计数
-      updateUnreadCount(message.chat_id, 1);
-    } catch (e) {
-      console.error('解析消息失败', e);
+  if (!newData || typeof newData !== 'string') return;
+
+  // 跳过心跳消息
+  if (newData === 'ping' || newData === 'pong') return;
+
+  try {
+    const message = JSON.parse(newData);
+
+    if (message.chat_id === selectedChatId.value) {
+      addMessage(message.text, false);
+    } else {
+      Toast.info(`来自${message.user_name || '未知用户'}的新消息`);
     }
+
+    updateUnreadCount(message.chat_id, 1);
+  } catch (e) {
+    console.warn('收到非JSON消息，跳过解析:', newData);
   }
 });
 
@@ -318,13 +311,14 @@ const addMessage = (text: string, isSent: boolean) => {
 
 // 发送消息
 const sendMessage = () => {
+  console.log('newMessage.value',newMessage.value,selectedChatId.value)
   if (newMessage.value.trim() && selectedChatId.value) {
     const messageData = {
       chat_id: selectedChatId.value,
       text: newMessage.value.trim(),
       receiver_id: selectedChat.value.user_id
     };
-    
+    console.log(JSON.stringify(messageData))
     // 发送WebSocket消息
     send(JSON.stringify(messageData));
     
@@ -436,6 +430,7 @@ onBeforeUnmount(() => {
 .admin-chat-container {
   display: flex;
   height: 100vh;
+  width: 100%;
   background-color: #f0f2f5;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -454,7 +449,7 @@ onBeforeUnmount(() => {
     width: 30%;
     min-width: 300px;
     max-width: 400px;
-    
+    flex: 0 0 30%; 
     &.collapsed {
       display: flex; /* 大屏上始终显示侧边栏 */
     }
@@ -515,9 +510,10 @@ onBeforeUnmount(() => {
   
   .van-badge {
     position: absolute;
-    top: -4px;
-    right: -4px;
+    top: 0;
+    right: 0;
     border: 2px solid white;
+    z-index: 1;
   }
 }
 
@@ -557,6 +553,7 @@ onBeforeUnmount(() => {
 .main-chat {
   flex: 1;
   display: flex;
+  width: auto; 
   flex-direction: column;
   background-color: #f0f2f5;
   position: relative;
@@ -657,7 +654,7 @@ onBeforeUnmount(() => {
 .message {
   display: flex;
   margin-bottom: 16px;
-  max-width: 80%;
+  max-width: 100%;
   align-self: flex-start;
   
   .message-avatar {
@@ -668,7 +665,7 @@ onBeforeUnmount(() => {
   .message-content-container {
     display: flex;
     flex-direction: column;
-    max-width: calc(100% - 46px);
+    max-width: 80%;
   }
   
   .message-content {
@@ -716,17 +713,26 @@ onBeforeUnmount(() => {
 }
 
 .input-container {
+  display: flex;
+  align-items: flex-end;
   padding: 12px 16px;
   background-color: white;
   border-top: 1px solid #e6e6e6;
-  
+
   .van-field {
+    flex: 1;
     background-color: #f0f2f5;
     border-radius: 20px;
     padding: 8px 16px;
   }
-}
 
+  .send-button {
+    margin-left: 14px;
+    min-width: 60px;
+    height: 40px;
+    width: 80px
+  }
+}
 .input-actions {
   display: flex;
   align-items: center;
