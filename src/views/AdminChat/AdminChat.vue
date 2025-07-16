@@ -25,6 +25,7 @@
               radius="8"
               width="48px"
               height="48px"
+              fit="contain"
               :src="'/avatars/'+chat.user_avatar || '/avatars/default-avatar.png'"
               class="user-avatar"
             />
@@ -60,6 +61,7 @@
               round
               width="40px"
               height="40px"
+              fit="contain"
               :src="'/avatars/'+selectedChat.user_avatar || '/avatars/default-avatar.png'"
               class="admin-avatar"
             />
@@ -94,7 +96,10 @@
               :src="'/avatars/'+selectedChat.user_avatar || '/avatars/default-avatar.png'"
               class="message-avatar"
             /> -->
-            <div class="message-content-container">
+            <div class="message-content-container"
+            @touchstart="startLongPress(message, $event)"
+            @touchend="endLongPress"
+            @contextmenu.prevent="handleRightClick(message, $event)">
               <div class="message-content">
                 {{ message.text }}
               </div>
@@ -106,6 +111,22 @@
               </div>
             </div>
           </div>
+          <van-popup
+          v-model:show="showRevokeConfirm"
+          position="bottom"
+          round
+          :style="{ height: '15%', paddingBottom: '20px' }"
+        >
+          <div class="revoke-popup">
+            <van-button color="#d75670" block @click="confirmRevoke" class="revoke-btn-confirm">
+              撤回
+            </van-button>
+            <van-button block @click="cancelRevoke" class="revoke-btn-cancel">
+              取消
+            </van-button>
+          </div>
+        </van-popup>
+          
         </div>
       </div>
       
@@ -152,6 +173,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useWebSocket } from '@vueuse/core';
 import dayjs from 'dayjs';
+import apiClient from '@/plugins/axios';
+import { v4 as uuidv4 } from 'uuid';
 import { 
   Image as VanImage, 
   Icon, 
@@ -182,6 +205,9 @@ const searchQuery = ref('');
 const loading = ref(false);
 const finished = ref(false);
 const showActions = ref(false);
+const showRevokeConfirm = ref(false);
+const selectedMessage = ref<any>(null);
+let longPressTimer: number | null = null;
 
 // 日期处理
 const today = ref(new Date());
@@ -201,6 +227,66 @@ const { data, send, open, close } = useWebSocket(WS_URL, {
   heartbeat: true,
   immediate: true,
 });
+
+const isWithinTwoMinutes = (time: Date) => {
+  return new Date().getTime() - new Date(time).getTime() < 2 * 60 * 1000;
+};
+
+const startLongPress = (message: any, event: TouchEvent) => {
+  if (!message.isSent || !isWithinTwoMinutes(message.time)) return;
+  event.preventDefault();
+  longPressTimer = window.setTimeout(() => {
+    selectedMessage.value = message;
+    showRevokeConfirm.value = true;
+  }, 800);
+};
+
+const endLongPress = () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+};
+
+const handleRightClick = (message: any, event: MouseEvent) => {
+  if (!message.isSent || !isWithinTwoMinutes(message.time)) return;
+  event.preventDefault();
+  selectedMessage.value = message;
+  showRevokeConfirm.value = true;
+};
+
+const confirmRevoke = async () => {
+  if (!selectedMessage.value) return;
+  try {
+    await revokeMessage(selectedMessage.value.id);
+    showRevokeConfirm.value = false;
+    selectedMessage.value = null;
+  } catch (e) {
+    showFailToast('撤回失败');
+  }
+};
+
+const cancelRevoke = () => {
+  showRevokeConfirm.value = false;
+  selectedMessage.value = null;
+};
+
+// 添加撤回消息函数
+const revokeMessage = async (messageId: number) => {
+  try {
+    
+    const response = await apiClient.post('/api/admin/chat/revoke', {
+      message_id: selectedMessage.value.id
+    });
+    
+    if (response.status === 200) {
+      // 从本地消息列表中移除
+      messages.value = messages.value.filter(msg => msg.id !== messageId);
+    }
+  } catch (error) {
+    console.error('撤回消息失败:', error);
+  }
+};
 
 // 过滤用户列表
 watch([activeChats, searchQuery], () => {
@@ -276,15 +362,16 @@ const closeChat = () => {
 // 监听WebSocket消息
 watch(data, (newData) => {
   if (!newData || typeof newData !== 'string') return;
-
   // 跳过心跳消息
   if (newData === 'ping' || newData === 'pong') return;
-
   try {
     const message = JSON.parse(newData);
 
-    if (message.chat_id === selectedChatId.value) {
-      addMessage(message.text, false);
+    if (message.type === 'revoke_message') {
+      // 处理撤回消息
+      messages.value = messages.value.filter(msg => msg.id !== message.id);
+    } else if (message.chat_id === selectedChatId.value) {
+      addMessage(message.text, false, message.id);
     } else {
       Toast.info(`来自${message.user_name || '未知用户'}的新消息`);
     }
@@ -296,9 +383,9 @@ watch(data, (newData) => {
 });
 
 // 添加消息
-const addMessage = (text: string, isSent: boolean) => {
+const addMessage = (text: string, isSent: boolean, id: string) => {
   messages.value.push({
-    id: Date.now(),
+    id: id,
     text,
     isSent,
     time: new Date(),
@@ -313,17 +400,21 @@ const addMessage = (text: string, isSent: boolean) => {
 const sendMessage = () => {
   console.log('newMessage.value',newMessage.value,selectedChatId.value)
   if (newMessage.value.trim() && selectedChatId.value) {
+    const messageId = uuidv4();
     const messageData = {
+      id: messageId,
       chat_id: selectedChatId.value,
       text: newMessage.value.trim(),
       receiver_id: selectedChat.value.user_id
     };
+
     console.log(JSON.stringify(messageData))
+    addMessage(newMessage.value.trim(), true, messageId);
     // 发送WebSocket消息
     send(JSON.stringify(messageData));
     
     // 添加到本地消息列表
-    addMessage(newMessage.value.trim(), true);
+    
     
     // 清空输入框
     newMessage.value = '';
@@ -374,6 +465,7 @@ const markMessagesAsRead = async (chatId: number) => {
     if (chat) {
       chat.unread_count = 0;
     }
+    loadActiveChats();
   } catch (error) {
     console.error('标记消息为已读失败', error);
   }
@@ -804,6 +896,13 @@ onBeforeUnmount(() => {
       margin-right: 10px;
       font-size: 18px;
     }
+  }
+}
+.revoke-popup {
+  padding: 16px;
+  .revoke-btn-confirm,
+  .revoke-btn-cancel {
+    margin-bottom: 8px;
   }
 }
 </style>

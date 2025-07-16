@@ -14,8 +14,12 @@
     
     <!-- 聊天消息区域 -->
     <div ref="messagesContainer" class="messages-container">
+
       <div v-for="(message, index) in messages" :key="index" 
-           :class="['message', message.isSent ? 'sent' : 'received']">
+           :class="['message', message.isSent ? 'sent' : 'received']"
+           @touchstart="startLongPress(message, $event)"
+            @touchend="endLongPress"
+           >
         <div class="message-content">
           {{ message.text }}
         </div>
@@ -23,6 +27,32 @@
           {{ formatTime(message.time) }}
         </div>
       </div>
+      <van-popup
+        v-model:show="showRevokeConfirm"
+        position="bottom"
+        round
+        :style="{ height: '15%', paddingBottom: '20px' }"
+      >
+        <div class="revoke-popup">
+          
+          <van-button 
+            color="#d75670"
+            block 
+            @click="confirmRevoke"
+            class="revoke-btn-confirm"
+          >
+            撤回
+          </van-button>
+          <van-button 
+            block 
+            @click="cancelRevoke"
+            class="revoke-btn-cancel"
+          >
+            取消
+          </van-button>
+        </div>
+      </van-popup>
+
     </div>
     
     <!-- 输入区域 -->
@@ -57,6 +87,12 @@ import { useAuthStore } from '@/store/authStore';
 import apiClient from '@/plugins/axios';
 import dayjs from 'dayjs';
 import sendIcon from '@/assets/icons/send.svg';
+import { showFailToast } from 'vant';
+import { v4 as uuidv4 } from 'uuid';
+
+const showRevokeConfirm = ref(false);
+const selectedMessage = ref<any>(null);
+let longPressTimer: number | null = null;
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -70,6 +106,60 @@ const adminName = ref('陈姐');
 const messages = ref<any[]>([]);
 const newMessage = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
+
+// 修改撤回函数
+const confirmRevoke = async () => {
+  if (!selectedMessage.value) return;
+  
+  try {
+    const response = await apiClient.post('/api/user/chat/revoke', {
+      message_id: selectedMessage.value.id
+    });
+    
+    if (response.status === 200) {
+      messages.value = messages.value.filter(msg => msg.id !== selectedMessage.value.id);
+      showRevokeConfirm.value = false;
+      selectedMessage.value = null;
+    }
+  } catch (error) {
+    console.error('撤回消息失败:', error);
+    // 可以添加错误提示
+    showFailToast('撤回失败，请重试');
+  }
+};
+
+// 修改长按事件处理（只保留移动端）
+const startLongPress = (message: any, event: Event) => {
+  if (!message.isSent || !isWithinTwoMinutes(message.time)) {
+    return;
+  }
+  
+  event.preventDefault();
+  
+  longPressTimer = window.setTimeout(() => {
+    selectedMessage.value = message;
+    showRevokeConfirm.value = true;
+  }, 800);
+};
+
+const endLongPress = () => {
+  if (longPressTimer !== null) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+};
+
+
+
+const cancelRevoke = () => {
+  showRevokeConfirm.value = false;
+  selectedMessage.value = null;
+};
+
+// 修改 isWithinTwoMinutes 函数
+const isWithinTwoMinutes = (time: Date) => {
+  return new Date().getTime() - new Date(time).getTime() < 2 * 60 * 1000;
+};
 
 // WebSocket连接
 // const WS_URL = `ws://${location.host}/ws/user/${userStore.profile?.id}`;
@@ -91,13 +181,18 @@ const { data, send, open, close } = useWebSocket(WS_URL, {
 // 监听WebSocket消息
 watch(data, (newData) => {
   if (!newData || typeof newData !== 'string') return;
-
   // 跳过心跳消息
   if (newData === 'ping' || newData === 'pong') return;
   if (newData) {
     try {
       const message = JSON.parse(newData);
-      addMessage(message.text, false);
+      if (message.type === 'revoke_message') {
+      // 处理撤回消息
+      messages.value = messages.value.filter(msg => msg.id !== message.id);
+    } else if ( message.type === 'user_message' || message.text) {
+      // 处理普通消息
+      addMessage(message.text, false, message.id);
+    }
     } catch (e) {
       console.error('解析消息失败', e);
     }
@@ -105,32 +200,37 @@ watch(data, (newData) => {
 });
 
 // 添加消息
-const addMessage = (text: string, isSent: boolean) => {
+const addMessage = (text: string, isSent: boolean, id: string) => {
+ 
   messages.value.push({
-    id: Date.now(),
+    id: id,
     text,
     isSent,
-    time: new Date()
+    time: new Date(),
+    read: isSent ? false : true
   });
-  
-  // 滚动到底部
   scrollToBottom();
+
+  // 滚动到底部
+  
 };
 
 // 发送消息
 const sendMessage = () => {
   if (newMessage.value.trim()) {
+    const messageId = uuidv4();
+
     const messageData = {
+      id: messageId,
       text: newMessage.value.trim(),
       sender_id: userStore.profile?.id
     };
     
     // 发送WebSocket消息
-    send(JSON.stringify(messageData));
     
     // 添加到本地消息列表
-    addMessage(newMessage.value.trim(), true);
-    
+    addMessage(newMessage.value.trim(), true, messageId);
+    send(JSON.stringify(messageData));
     // 清空输入框
     newMessage.value = '';
   }
@@ -155,6 +255,27 @@ const goBack = () => {
   router.back();
 };
 
+// 添加撤回消息函数
+// const revokeMessage = async (messageId: number) => {
+//   try {
+//     const response = await fetch('/api/user/chat/revoke', {
+//       method: 'POST',
+//       headers: {
+//         'Authorization': `Bearer ${authStore.token}`,
+//         'Content-Type': 'application/json'
+//       },
+//       body: JSON.stringify({ message_id: messageId })
+//     });
+    
+//     if (response.ok) {
+//       // 从本地消息列表中移除
+//       messages.value = messages.value.filter(msg => msg.id !== messageId);
+//     }
+//   } catch (error) {
+//     console.error('撤回消息失败:', error);
+//   }
+// };
+
 // 加载历史消息
 const loadHistory = async () => {
   try {
@@ -167,12 +288,14 @@ const loadHistory = async () => {
     // }));
     if (data && data.length > 0) {
       messages.value = data.map((msg: any) => ({
+        id: msg.id,
         text: msg.content,
         isSent: msg.is_sent,
         time: new Date(msg.sent_at)
       }));
     } else {
       messages.value = [{
+        id: Date.now(),
         text: '您好，我是陈姐，有什么可以帮您的吗？',
         isSent: false,
         time: new Date()
@@ -256,6 +379,10 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
+  &:active {
+    opacity: 0.7;
+    transition: opacity 0.1s;
+  }
 }
 
 .message.received {
