@@ -317,40 +317,38 @@ watch(customAmount, () => {
 });
 
 const initWechatSDK = async () => {
+  if (sdkReady.value || sdkInitStarted.value) return;
+  sdkInitStarted.value = true;
+
   try {
-    // 1. 获取当前页面的URL（去掉#后面的部分）
     const url = window.location.href.split('#')[0];
-    
-    // 2. 从后端获取JS-SDK配置
     const configResponse = await apiClient.get('/api/wechat/jssdk-signature', {
       params: { url }
     });
-    
+
     const configData = configResponse.data;
-    
-    // 3. 配置微信JS-SDK
+
     wx.config({
-      debug: false, // 生产环境关闭调试
+      debug: false,
       appId: configData.appId,
       timestamp: configData.timestamp,
       nonceStr: configData.nonceStr,
       signature: configData.signature,
-      jsApiList: ['chooseWXPay'] // 只需要支付API
+      jsApiList: ['chooseWXPay']
     });
-    
-    // 4. 验证配置
+
     wx.ready(() => {
       sdkReady.value = true;
       console.log('微信JS-SDK初始化完成');
     });
-    
+
     wx.error((res: any) => {
       console.error('微信JS-SDK配置失败:', res);
-      alert('微信支付环境初始化失败，请刷新页面重试');
+      showToast('微信支付初始化失败，请重试');
     });
   } catch (error) {
-    console.error('初始化微信JS-SDK失败:', error);
-    alert('初始化微信支付失败，请重试');
+    console.error('初始化失败:', error);
+    showToast('微信支付初始化失败，请重试');
   }
 };
 
