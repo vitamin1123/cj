@@ -131,6 +131,7 @@ import { showToast } from 'vant';
 import apiClient from '@/plugins/axios';
 import wx from 'weixin-js-sdk';
 const sdkReady = ref(false); 
+const sdkInitStarted = ref(false);
 const props = defineProps<{
   modelValue: boolean;
 }>();
@@ -239,6 +240,14 @@ const loadTotalTips = async () => {
 };
 
 const handleReward = async () => {
+  if (!sdkReady.value) {
+    if (!sdkInitStarted.value) {
+      sdkInitStarted.value = true;
+      await initWechatSDK();
+    }
+    showToast('微信支付环境初始化中，请稍候');
+    return;
+  }
   if (!finalAmount.value || finalAmount.value <= 0) {
     showToast('请输入有效的打赏金额');
     return;
@@ -345,9 +354,9 @@ const initWechatSDK = async () => {
   }
 };
 
-onMounted(() => {
-  initWechatSDK();
-});
+// onMounted(() => {
+//   initWechatSDK();
+// });
 
 </script>
 
