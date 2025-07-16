@@ -290,12 +290,9 @@ if (!sdkReady.value) {
 };
 
 // 监听弹窗打开
-watch(() => show.value, async (newVal) => {
+watch(() => show.value, (newVal) => {
   if (newVal) {
     loadTotalTips();
-    if (!sdkReady.value) {
-      await initWechatSDK(); // 弹窗打开时初始化
-    }
     // 自动填充随机祝福
     if (!blessing.value) {
       randomBlessing();
@@ -348,9 +345,9 @@ const initWechatSDK = async () => {
   }
 };
 
-// onMounted(() => {
-//   initWechatSDK();
-// });
+onMounted(() => {
+  initWechatSDK();
+});
 
 </script>
 

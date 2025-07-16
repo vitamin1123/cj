@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     RewardPopup: typeof import('./src/components/RewardPopup.vue')['default']
+    'RewardPopup copy': typeof import('./src/components/RewardPopup copy.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TabBar: typeof import('./src/components/TabBar.vue')['default']
