@@ -47,7 +47,17 @@
           </div>
         </div>
       </div>
-
+        <van-notice-bar
+          v-if="showRejectionNotice && rejectionInfo"
+          left-icon="warning-o"
+          color="#1989fa"
+          background="#ecf9ff"
+          mode="closeable"
+          @close="markRejectionAsRead"
+        >
+          <span style="font-weight: bold; color: #ff6b6b;">资料审核未通过：</span>
+          {{ rejectionInfo.reason }}
+        </van-notice-bar>
       <!-- 管理菜单卡片 -->
       <div class="menu-card">
         <h2 class="section-title">管理</h2>
@@ -157,6 +167,45 @@ const fileList = ref<any[]>([]);
 const userPhotos = ref<string[]>([]);
 const recentVisitorsCount = ref(0);
 
+
+const showRejectionNotice = ref(false);
+const rejectionInfo = ref<{
+  reason: string;
+  created_at: string;
+  is_read: boolean;
+} | null>(null);
+
+// 获取驳回信息
+const fetchRejectionInfo = async () => {
+  try {
+    const response = await apiClient.get('/api/user/rejection');
+    if (response.data.has_rejection && !response.data.is_read) {
+      rejectionInfo.value = {
+        reason: response.data.reason,
+        created_at: response.data.created_at,
+        is_read: response.data.is_read
+      };
+      showRejectionNotice.value = true;
+    }
+  } catch (error) {
+    console.error('获取驳回信息失败', error);
+  }
+};
+
+// 标记驳回为已读
+const markRejectionAsRead = async () => {
+  if (!rejectionInfo.value) return;
+  
+  try {
+    await apiClient.post('/api/user/rejection/mark-read');
+    showRejectionNotice.value = false;
+    rejectionInfo.value = null;
+  } catch (error) {
+    console.error('标记已读失败', error);
+    showToast('操作失败，请重试');
+  }
+};
+
 // 从store中获取用户信息
 const user = computed(() => {
   // 获取用户头像和性别
@@ -231,6 +280,7 @@ const fetchVisitCount = async () => {
 onMounted(async() => {
   // fetchUserProfile();
   await fetchVisitCount();
+  await fetchRejectionInfo(); // 获取驳回信息
 });
 
 // 编辑头像
@@ -604,7 +654,7 @@ const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
   background-color: #FFFFFF;
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
   border: 1px solid #D9D9D9;
 }
 
@@ -853,5 +903,10 @@ const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
   padding: 16px 0;
   border-top: 1px solid #f0f0f0;
   margin-top: auto;
+}
+
+.van-notice-bar {
+  margin-bottom: 8px;
+  border-radius: 8px;
 }
 </style>

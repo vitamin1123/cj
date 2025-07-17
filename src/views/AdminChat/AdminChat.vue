@@ -36,7 +36,7 @@
               width="48px"
               height="48px"
               fit="contain"
-              :src="'/avatars/'+chat.user_avatar || '/avatars/default-avatar.png'"
+              :src="`/avatars/${chat.user_avatar}`"
               class="user-avatar"
             />
             <van-badge :content="chat.unread_count" v-if="chat.unread_count > 0" />
@@ -72,7 +72,7 @@
               width="40px"
               height="40px"
               fit="contain"
-              :src="'/avatars/'+selectedChat.user_avatar || '/avatars/default-avatar.png'"
+              :src="`/avatars/${selectedChat.user_avatar}`"
               class="admin-avatar"
             />
             <div class="user-details">
@@ -320,11 +320,22 @@ const loadActiveChats = async () => {
   try {
     loading.value = true;
     const response = await fetchActiveChats();
-    activeChats.value = response.data.map((chat: any) => ({
-      ...chat,
-      unread_count: chat.unread_count || 0,
-      last_message_time: new Date(chat.last_message_time || new Date())
-    }));
+    activeChats.value = response.data.map((chat: any) => {
+      let avatar = 'notregisted.png'; // 默认值
+
+      if (chat.user_avatar) {
+        avatar = chat.user_avatar;
+      } else if (chat.user_gender !== null) {
+        avatar = chat.user_gender === 1 ? 'male_def.png' : 'female_def.png';
+      }
+
+      return {
+        ...chat,
+        user_avatar: avatar,
+        unread_count: chat.unread_count || 0,
+        last_message_time: new Date(chat.last_message_time || new Date())
+      };
+    });
     filteredChats.value = [...activeChats.value];
     finished.value = true;
   } catch (error) {
@@ -334,7 +345,6 @@ const loadActiveChats = async () => {
     loading.value = false;
   }
 };
-
 // 选择聊天会话
 const selectChat = async (chat: any) => {
   console.log('chat',chat)

@@ -114,6 +114,7 @@
               :formatter="heightFormatter"
               :rules="[{ required: true, message: '请输入身高' }, { validator: heightValidator, message: '身高范围120-240cm' }]"
               class="setup-input"
+              @keyup.enter="handleEnter"
             >
               <template #right-icon>
                 <span class="input-unit">cm</span>
@@ -138,6 +139,7 @@
               :max="250"
               :rules="[{ required: true, message: '请输入体重' }, { validator: weightValidator, message: '体重不能超过250kg' }]"
               class="setup-input"
+              @keyup.enter="handleEnter"
             >
               <template #right-icon>
                 <span class="input-unit">kg</span>
@@ -233,6 +235,7 @@
               input-align="center"
               :rules="[{ required: true, message: '请输入职业' }]"
               maxlength="50"
+              @keyup.enter="handleEnter"
             />
           </div>
         </div>
@@ -342,6 +345,7 @@
                 { validator: phoneValidator, message: '请输入正确的手机号码' }
               ]"
               class="setup-input"
+              @keyup.enter="handleEnter"
             />
           </div>
         </div>
@@ -418,7 +422,7 @@ const userStore = useUserInfoStore()
 const router = useRouter();
 const swipeRef = ref();
 const currentStep = ref(1);
-const totalSteps = 15;
+
 const showDatePicker = ref(false);
 const dateValue = ref(new Date());
 
@@ -433,6 +437,12 @@ const maxDate = new Date(2100, 12, 31);
 
 const showAreaPicker = ref(false);
 const showReligionPicker = ref(false);
+
+const handleEnter = () => {
+  if (canProceed.value) {
+    nextStep();
+  }
+};
 
 const offset = ref({ x: 20, y: 40 });
 // 直接使用导入的areaList数据
@@ -456,6 +466,14 @@ const formData = ref({
   privateBio: '',
   married: 0,
   child: 0
+});
+
+const totalSteps = computed(() => {
+  let steps = 14; // 固定显示的总页数（不含孩子状况）
+  if (formData.value.married === 1) {
+    steps += 1; // 已婚时加1页（孩子状况）
+  }
+  return steps;
 });
 
 const showChildrenStep = computed(() => {
@@ -602,31 +620,30 @@ const canProceed = computed(() => {
 //   currentStep.value = index + 1;
 // };
 
-const nextStep = () => {
-  if (currentStep.value === totalSteps) {
-    submitForm();
-  } else {
-    // swipeRef.value?.next();
-    // currentStep.value++;
-    if (currentStep.value === 5 && formData.value.married === 0) {
-        currentStep.value += 2; // 直接跳到第7步
-      } else {
-        currentStep.value++;
-      }
-    swipeRef.value?.swipeTo(currentStep.value - 1);
+const getSwipeIndex = (step: number) => {
+  // 如果未婚，且逻辑步骤 >= 6，swipe索引要减1
+  if (formData.value.married === 0 && step >= 6) {
+    return step - 2; // 跳过第6步
   }
+  return step - 1;
+};
+
+const nextStep = () => {
+  if (currentStep.value === totalSteps.value) {
+    submitForm();
+    return;
+  }
+
+  currentStep.value++;
+  swipeRef.value?.swipeTo(getSwipeIndex(currentStep.value));
 };
 
 const prevStep = () => {
-//   swipeRef.value?.prev();
-//    currentStep.value--;
-if (currentStep.value === 7 && formData.value.married === 0) {
-    currentStep.value = 5; // 回退到婚姻状况步骤
-  } else {
-    currentStep.value--;
-  }
-  swipeRef.value?.swipeTo(currentStep.value - 1);
+  currentStep.value--;
+  swipeRef.value?.swipeTo(getSwipeIndex(currentStep.value));
 };
+
+
 
 const submitForm = async () => {
   try {
@@ -642,8 +659,8 @@ const submitForm = async () => {
       education: formData.value.education,
       married: formData.value.married,
       child: formData.value.child,
-      religion: formData.value.religion,
-      mbti: formData.value.mbti,
+      religion: formData.value.religion || null,
+      mbti: formData.value.mbti || null,
       phone: formData.value.phone,
       mem: formData.value.bio,
       mem_pri: formData.value.privateBio
@@ -778,7 +795,9 @@ const loadDataFromStore = () => {
   }
 };
 watch(() => userStore.profile, loadDataFromStore, { immediate: true })
-
+watch(currentStep, (newVal) => {
+  swipeRef.value?.swipeTo(getSwipeIndex(newVal));
+});
 onMounted(() => {
   // 初始化当前日期为今天
   if (userStore.profile) {

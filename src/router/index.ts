@@ -151,7 +151,7 @@ router.beforeEach(async (to, from, next) => {
   const fullUrl = `${window.location.origin}${to.fullPath}`
   urlStore.updateCurrentUrl(fullUrl)
   // 允许访问的白名单路由
-  const publicRoutes = ['/reopen', '/auth-success', '/404', '/payment', '/home','/userCenter','/profile-setup'];
+  const publicRoutes = ['/home','/reopen', '/auth-success', '/404', '/payment' ,'/chat','/userCenter','/profile-setup'];
   
   if (publicRoutes.includes(to.path)) {
     return next();
