@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watchEffect, toRaw } from 'vue'
+import { ref, computed, watchEffect, toRaw  } from 'vue'
 import apiClient from '@/plugins/axios'
 import localforage from 'localforage'
 
@@ -34,14 +34,39 @@ interface User {
 }
 
 interface UserListResponse {
-  people: Record<string, User>
+  people: Record<string, User>  // 后端返回的是字符串化的对象
   lasttime: string
 }
 
 interface StoredUserListData {
   usersById: Record<number, User>;
   lasttime: string | null;
-  sortedIds: number[]; // 新增：有序ID数组
+}
+
+// 自定义存储适配器类型
+interface CustomPersistStorage {
+  getItem: (key: string) => Promise<string | null>
+  setItem: (key: string, value: string) => Promise<void>
+  removeItem?: (key: string) => Promise<void>
+}
+
+function sortUsersRecord(record: Record<number, User>): Record<number, User> {
+  const entries = Object.entries(record).map(([idStr, user]) => [
+    Number(idStr),
+    user,
+  ]) as [number, User][];
+
+  entries.sort(([, a], [, b]) => {
+    if (a.istop !== b.istop) return b.istop - a.istop;
+    return b.points - a.points;
+  });
+
+  // 重新组装成对象（保持插入顺序）
+  const sorted: Record<number, User> = {};
+  entries.forEach(([id, user]) => {
+    sorted[id] = user;
+  });
+  return sorted;
 }
 
 // 创建自定义持久化存储
@@ -63,88 +88,86 @@ const createPersistStorage = () => ({
   }
 });
 
-// 排序函数：根据istop和points排序
-const sortUserIds = (users: Record<number, User>): number[] => {
-  return Object.values(users)
-    .sort((a, b) => {
-      if (a.istop !== b.istop) return b.istop - a.istop;
-      return b.points - a.points;
-    })
-    .map(user => user.id);
-};
-
 export const useUserListStore = defineStore(
   'userList',
   () => {
+    // 使用对象存储
     const usersById = ref<Record<number, User>>({});
-    const sortedIds = ref<number[]>([]); // 新增：有序ID数组
     const lasttime = ref<string | null>(null);
     const isLoading = ref(false);
     const error = ref<string | null>(null);
 
-    // 计算属性：获取按排序后的用户数组
-    const peopleArray = computed(() => {
-      return sortedIds.value.map(id => usersById.value[id]).filter(Boolean);
-    });
-
-    // 计算属性：获取用户Map（保持不变，用于快速查找）
-    const usersMap = computed(() => usersById.value);
-
+    // 计算属性：获取用户数组
+    const peopleArray = computed(() => Object.values(usersById.value));
+    
     // Actions
     const checkLasttimeAndUpdate = async (): Promise<void> => {
       try {
         const response = await apiClient.get('/api/getlasttime')
         const serverLasttime = response.data.lasttime as string
         
-        const hasLocalData = sortedIds.value.length > 0
+        // 改进首次加载判断逻辑
+        const hasLocalData = Object.keys(usersById.value).length > 0
         const hasLastTime = !!lasttime.value
         
+        // 首次加载：无本地数据或没有lasttime
         if (!hasLocalData || !hasLastTime) {
           await fetchUserList()
           return
         }
         
+        // 服务器有更新时获取增量数据
         if (serverLasttime && lasttime.value && serverLasttime > lasttime.value) {
           await fetchIncrementalUserList(lasttime.value)
         }
       } catch (err) {
         error.value = '检查更新时间失败'
         console.error('Failed to check lasttime:', err)
+        // 回退到全量更新
         await fetchUserList()
       }
     }
 
+    // 优化后的fetchUserList - 直接处理对象格式
     const fetchUserList = async (): Promise<void> => {
       isLoading.value = true;
       error.value = null;
       try {
         const response = await apiClient.get<UserListResponse>('/api/explore_people_dic');
         if (response.status === 200 && response.data) {
+          // 直接处理API返回的对象格式
           const rawData = response.data.people;
           
           // 转换键为数字类型
           const processedDict: Record<number, User> = {};
+          
           Object.entries(rawData).forEach(([key, user]) => {
             const userId = parseInt(key, 10);
             if (!isNaN(userId)) {
               processedDict[userId] = user;
+            } else {
+              console.warn(`Invalid user ID: ${key}`);
             }
           });
 
           usersById.value = processedDict;
-          sortedIds.value = sortUserIds(processedDict); // 更新有序ID数组
           lasttime.value = response.data.lasttime;
-          
-          console.log(`成功加载 ${sortedIds.value.length} 条用户数据`);
+          console.log(`成功加载 ${Object.keys(processedDict).length} 条用户数据`);
         }
       } catch (err) {
         error.value = '获取用户列表失败';
         console.error('Failed to fetch user list:', err);
+        
+        // 更详细的错误日志
+        if (err instanceof SyntaxError) {
+          console.error('JSON解析错误，原始数据:', err);
+        }
       } finally {
         isLoading.value = false;
       }
     };
 
+    // 优化增量数据获取
     const fetchIncrementalUserList = async (since: string): Promise<void> => {
       isLoading.value = true;
       error.value = null;
@@ -156,18 +179,16 @@ export const useUserListStore = defineStore(
         if (response.status === 200 && response.data) {
           const rawData = response.data.people;
           
-          // 合并/更新现有用户数据
+          // 处理增量数据
           Object.entries(rawData).forEach(([key, user]) => {
             const userId = parseInt(key, 10);
             if (!isNaN(userId)) {
+              // 合并/更新现有用户数据
               usersById.value[userId] = user;
             }
           });
           
-          // 重新排序并更新有序ID数组
-          sortedIds.value = sortUserIds(usersById.value);
           lasttime.value = response.data.lasttime;
-          
           console.log(`成功更新 ${Object.keys(rawData).length} 条用户数据`);
         }
       } catch (err) {
@@ -178,33 +199,35 @@ export const useUserListStore = defineStore(
       }
     };
     
+    // 初始化方法
     const initializeStore = async (): Promise<void> => {
       try {
         const storedData = await userListStorage.getItem<StoredUserListData>('userListData');
         
         if (storedData) {
+          // 直接使用存储的数据
           usersById.value = storedData.usersById;
-          sortedIds.value = storedData.sortedIds || sortUserIds(storedData.usersById); // 兼容旧数据
           lasttime.value = storedData.lasttime;
-          console.log(`从存储加载 ${sortedIds.value.length} 条用户数据`);
+          console.log(`从存储加载 ${Object.keys(storedData.usersById).length} 条用户数据`);
         }
       } catch (err) {
         console.error('初始化存储失败:', err);
+        // 清除问题数据
         await userListStorage.removeItem('userListData');
       }
       
+      // 无论是否有本地数据都检查更新
       await checkLasttimeAndUpdate();
     }
 
     const saveToStorage = async (): Promise<void> => {
       try {
+        // 使用 toRaw 获取非响应式原始数据
         const rawUsersById = toRaw(usersById.value);
-        const rawSortedIds = toRaw(sortedIds.value);
-        const rawLasttime = lasttime.value;
+        const rawLasttime = lasttime.value; // 基本类型不需要转换
         
         const dataToStore: StoredUserListData = {
           usersById: rawUsersById,
-          sortedIds: rawSortedIds,
           lasttime: rawLasttime
         };
         
@@ -213,6 +236,7 @@ export const useUserListStore = defineStore(
         console.error('保存数据失败:', err);
         if ((err as Error).name === 'QuotaExceededError') {
           console.warn('存储空间不足，尝试清理旧数据...');
+          // 清理策略：保留最近的100个用户
           const allIds = Object.keys(usersById.value);
           if (allIds.length > 100) {
             const idsToRemove = allIds
@@ -223,16 +247,15 @@ export const useUserListStore = defineStore(
               delete usersById.value[id];
             });
             
-            // 重新排序
-            sortedIds.value = sortUserIds(usersById.value);
             console.log(`清理了 ${idsToRemove.length} 条旧数据`);
+            // 重试保存
             await saveToStorage();
           }
         }
       }
     }
 
-    // 计算属性：格式化用户信息（保持不变）
+    // Computed
     const formattedPeople = computed(() => {
       return peopleArray.value.map(person => ({
         ...person,
@@ -242,28 +265,30 @@ export const useUserListStore = defineStore(
       }));
     });
 
-    // 自动保存
+    // Auto-save when data changes
     watchEffect(() => {
-      const hasUsers = sortedIds.value.length > 0;
+      const hasUsers = Object.keys(usersById.value).length > 0;
+      
       if (hasUsers || lasttime.value) {
         saveToStorage();
       }
     })
 
     return {
+      // State
       usersById,
-      sortedIds, // 暴露有序ID数组
       lasttime,
       isLoading,
       error,
       
+      // Computed
       formattedPeople,
-      peopleArray,
-      usersMap,
+      peopleArray, // 暴露计算属性
       
+      // Actions
       initializeStore,
       fetchUserList,
-      checkLasttimeAndUpdate
+      checkLasttimeAndUpdate // 暴露给外部调用
     }
   },
   {

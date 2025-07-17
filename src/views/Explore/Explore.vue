@@ -108,9 +108,18 @@
           </div>
         </div>
       </div>
-
+      <div v-if="!isReady" class="skeleton-container">
+        <div v-for="i in 6" :key="i" class="person-card skeleton">
+          <div class="card-image skeleton-image"></div>
+          <div class="card-content">
+            <div class="skeleton-text skeleton-title"></div>
+            <div class="skeleton-text skeleton-line"></div>
+            <div class="skeleton-text skeleton-line short"></div>
+          </div>
+        </div>
+      </div>
       <!-- 人员卡片列表 - 使用虚拟列表 -->
-      <div class="people-grid" v-bind="containerProps">
+      <div v-else class="people-grid" v-bind="containerProps">
         <div v-bind="wrapperProps">
           <div v-for="{ index, data: person } in virtualList" :key="index" 
                class="person-card" 
@@ -215,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, onDeactivated, nextTick, toRefs } from 'vue';
+import { ref, computed, onMounted, onActivated, onDeactivated, nextTick, toRefs  } from 'vue';
 import TabBar from '@/components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { Toast, showFailToast, showSuccessToast } from 'vant';
@@ -233,6 +242,8 @@ import { useUserListStore } from '@/store/userList';
 import { useUserInfoStore } from '@/store/userinfo';
 import { useLikeStore } from '@/store/likeStore';
 import { useExploreStore } from '@/store/exploreStore';
+import { debounce } from 'lodash-es';
+import { processInBatches } from '@/utils/batch'; 
 
 const exploreStore = useExploreStore();
 
@@ -249,7 +260,7 @@ const {
 } = toRefs(exploreStore.state);
 
 
-
+const isReady = ref(false);
 const viewStateStore = useViewStateStore();
 const { exploreScrollPosition } = storeToRefs(viewStateStore);
 const { setExploreScrollPosition } = viewStateStore;
@@ -267,7 +278,7 @@ const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
   filteredPeopleList,
   {
     itemHeight: 260,
-    overscan: 5
+    overscan: 2
   }
 );
 const peopleGridRef = containerProps.ref;
@@ -709,14 +720,17 @@ const formatLunar = (date: Date | null): Zodiac => {
 const loadUserProfiles = async () => {
   const userListStore = useUserListStore();
   try {
-    // 直接从store获取用户数组
+    // 确保用户数据已加载
+    if (userListStore.sortedIds.length === 0) {
+      await userListStore.initializeStore();
+    }
+    
+    // 使用有序的用户数据
     allPeopleList.value = userListStore.peopleArray.map(profile => {
-      // 处理出生年份
       const birthYear = profile.birth_date 
         ? new Date(profile.birth_date).getFullYear() 
         : 0;
       
-      // 计算生肖
       let zodiac = '未知';
       try {
         if (profile.birth_date) {
@@ -753,37 +767,7 @@ const loadUserProfiles = async () => {
     return false;
   }
 };
-const loadUserProfiles_1 = async () => {
-  const userListStore = useUserListStore();
-  try {
-    // await userListStore.fetchUserList();
-    
-    allPeopleList.value = userListStore.formattedPeople.map(profile => ({
-      id: profile.id,
-      nickname: profile.nickname,
-      birthYear: new Date(profile.birth_date).getFullYear(),
-      zodiac: zodiacMapping[formatLunar(new Date(profile.birth_date))],
-      mem: profile.mem,
-      height: profile.height,
-      gender: profile.gender,
-      region: profile.region_code,
-      occupation: profile.occupation,
-      education: profile.education,
-      avatar: profile.avatar,
-      photo: profile.photo,
-      liked: likeStore.hasLiked(profile.id),
-      isNew: false
-    }));
-    
-    filteredPeopleList.value = [...allPeopleList.value];
-    console.log('filteredPeopleList.value: ',filteredPeopleList.value[0])
-    return true
-  } catch (error) {
-    console.error('加载用户数据失败:', error);
-    showFailToast('加载数据失败');
-    return false
-  }
-};
+
 
 
 const toggleLike = async (person: Person) => {
@@ -837,6 +821,11 @@ onMounted(async() => {
     }
     handleSearch();
   }
+  await nextTick();
+  setTimeout(() => {
+    isReady.value = true;
+  }, 100);
+  
   console.log('currentUser:', currentUser.value?.region_code.substring(0, 4),);
   console.log('onMounted triggered. peopleGridRef.value:', peopleGridRef.value);
 });
