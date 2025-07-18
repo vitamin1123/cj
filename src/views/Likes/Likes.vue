@@ -232,13 +232,23 @@ const formatLikeTime = (dateStr: string) => {
 
 // 获取人员图片URL
 const getPersonImage = (person: LikedPerson): string => {
+  // 优先使用 photo 第一张
   if (person.photo) {
     const photos = person.photo.split(',');
-    if (photos.length > 0 && photos[0].trim() !== '') {
-      return '/avatars/' + photos[0].trim();
+    const firstPhoto = photos[0]?.trim();
+    if (firstPhoto) {
+      return `/photo/${firstPhoto}`;
     }
   }
-  return person.avatar ? '/avatars/' + person.avatar : '';
+
+  // 其次使用 avatar
+  if (person.avatar) {
+    return `/avatars/${person.avatar}`;
+  }
+
+  // 否则根据性别返回默认头像
+  const gender = person.gender === 'female' ? 'female' : 'male';
+  return `/avatars/${gender}_def.png`;
 };
 
 const toggleFilter = (filter: Filter) => {

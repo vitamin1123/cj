@@ -221,7 +221,7 @@ const showActions = ref(false);
 const showRevokeConfirm = ref(false);
 const selectedMessage = ref<any>(null);
 let longPressTimer: number | null = null;
-const offset = ref({ x: 0.05 * window.innerWidth, y: 0.03 * window.innerHeight });
+const offset = ref({ x: 0.05 * window.innerWidth, y: 0.83 * window.innerHeight });
 // 日期处理
 const today = ref(new Date());
 

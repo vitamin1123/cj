@@ -74,7 +74,7 @@
               <van-image
                 width="48"
                 height="48"
-                :src="getAvatarUrl(user.avatar)"
+                :src="getAvatarUrl(user.avatar, user.gender)"
                 round
                 fit="cover"
                 lazy-load
@@ -239,8 +239,12 @@ const formatExpireDate = (dateStr: string | null) => {
 };
 
 // 获取用户头像URL
-const getAvatarUrl = (avatar: string) => {
-  return avatar ? `avatars/${avatar}` : '';
+const getAvatarUrl = (avatar: string, gender: string) => {
+  if (avatar) {
+    return `avatars/${avatar}`;
+  }
+  const defaultAvatar = gender === 'female' ? 'female_def.png' : 'male_def.png';
+  return `avatars/${defaultAvatar}`;
 };
 
 // 设置激活标签

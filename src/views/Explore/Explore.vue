@@ -466,14 +466,23 @@ const zodiacOptions: ZodiacOption[] = [
 
 // 获取人员图片URL
 const getPersonImage = (person: Person): string => {
-  
+  // 优先使用 photo 第一张
   if (person.photo) {
     const photos = person.photo.split(',');
-    if (photos.length > 0 && photos[0].trim() !== '') {
-      return 'photo/'+photos[0].trim();
+    const firstPhoto = photos[0]?.trim();
+    if (firstPhoto) {
+      return `photo/${firstPhoto}`;
     }
   }
-  return 'avatars/'+person.avatar || '';
+
+  // 其次使用 avatar
+  if (person.avatar) {
+    return `avatars/${person.avatar}`;
+  }
+
+  // 否则根据性别返回默认头像
+  const gender = person.gender === 'female' ? 'female' : 'male';
+  return `avatars/${gender}_def.png`;
 };
 
 const handleSearchFocus = () => {

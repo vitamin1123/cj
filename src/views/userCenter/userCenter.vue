@@ -984,8 +984,8 @@ const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 
 .level-below {
   display: block;
-  width: 36px;
-  height: 20px;
+  width: 48px;
+  height: 30px;
   margin: 6px auto 0;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.2));
   cursor: pointer;
