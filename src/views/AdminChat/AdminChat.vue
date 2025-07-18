@@ -392,22 +392,68 @@ const goBack = () => {
 };
 
 // 监听WebSocket消息
+// watch(data, (newData) => {
+//   if (!newData || typeof newData !== 'string') return;
+//   // 跳过心跳消息
+//   if (newData === 'ping' || newData === 'pong') return;
+//   try {
+//     const message = JSON.parse(newData);
+
+//     if (message.type === 'revoke_message') {
+//       // 处理撤回消息
+//       messages.value = messages.value.filter(msg => msg.id !== message.id);
+//     } else if (message.chat_id === selectedChatId.value) {
+//       addMessage(message.text, false, message.id);
+//     } else {
+//       Toast.info(`来自${message.user_name || '未知用户'}的新消息`);
+//     }
+
+//     updateUnreadCount(message.chat_id, 1);
+//   } catch (e) {
+//     console.warn('收到非JSON消息，跳过解析:', newData);
+//   }
+// });
 watch(data, (newData) => {
   if (!newData || typeof newData !== 'string') return;
   // 跳过心跳消息
   if (newData === 'ping' || newData === 'pong') return;
+
   try {
     const message = JSON.parse(newData);
 
+    // ✅ 处理聊天列表实时更新
+    if (message.type === 'chat_list_update') {
+      const updatedChat = message.chat;
+
+      const index = activeChats.value.findIndex(c => c.chat_id === updatedChat.chat_id);
+      if (index !== -1) {
+        // 更新已有会话
+        activeChats.value[index] = { ...activeChats.value[index], ...updatedChat };
+      } else {
+        // 新增会话（从未聊过的新用户）
+        activeChats.value.unshift(updatedChat);
+      }
+
+      // 同步过滤列表
+      filteredChats.value = [...activeChats.value];
+      return;
+    }
+
+    // ✅ 处理消息撤回
     if (message.type === 'revoke_message') {
-      // 处理撤回消息
       messages.value = messages.value.filter(msg => msg.id !== message.id);
-    } else if (message.chat_id === selectedChatId.value) {
+      return;
+    }
+
+    // ✅ 当前聊天窗口内的消息
+    if (message.chat_id === selectedChatId.value) {
       addMessage(message.text, false, message.id);
     } else {
+      // ✅ 非当前窗口的新消息提示
       Toast.info(`来自${message.user_name || '未知用户'}的新消息`);
     }
 
+    // ✅ 更新未读数（兼容旧逻辑）
     updateUnreadCount(message.chat_id, 1);
   } catch (e) {
     console.warn('收到非JSON消息，跳过解析:', newData);

@@ -101,6 +101,12 @@
                 <span class="likes">
                   <van-icon name="like" color="#D75670" /> {{ user.like_count }}
                 </span>
+
+                <img
+                  class="level-icon"
+                  :src="getLevelIcon(user.points ?? 0)"
+                  alt="level"
+                />
                 <span class="top-badge" v-if="user.is_top">
                   <van-icon name="fire" color="#FFA940" /> 置顶
                 </span>
@@ -170,6 +176,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { getPreviousRoute } from '@/utils/routeHistory';
+import { getLevelIcon } from '@/utils/levelIcon';
 import { 
   Image as VanImage, 
   Switch, 
@@ -195,6 +202,7 @@ import type { RouteLocationNormalized } from 'vue-router';
 type LocalAdminUser = AdminUser & {
   updating?: boolean;
   topping?: boolean;
+
 }
 const router = useRouter();
 // 分页相关状态
@@ -334,7 +342,7 @@ const toggleTopStatus = async (user: LocalAdminUser, isTop: boolean) => {
 
 // 初始化加载数据
 onMounted(() => {
-  onLoad();
+  // onLoad();
 });
 </script>
 
@@ -557,5 +565,12 @@ onMounted(() => {
 .no-data p {
   margin-top: 16px;
   font-size: 14px;
+}
+
+.level-icon {
+  width: 36px;
+  height: 24px;
+  /* vertical-align: middle; */
+  /* filter: drop-shadow(0 1px 1px rgba(0,0,0,.1)); */
 }
 </style>

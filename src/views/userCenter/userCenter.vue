@@ -9,9 +9,48 @@
             <div class="avatar" :style="{ backgroundImage: `url(${user.avatarUrl})` }">
               <div v-if="!user.avatarUrl" class="avatar-placeholder">+</div>
             </div>
+            <img
+              class="level-below"
+              :src="getLevelIcon(currentPoints)"
+              alt="level"
+              @click.stop="showLevelPopover = true"
+            />
+
             <!-- <div v-if="!paymentStore.isPaid" class="edit-hint">升级会员解锁</div>
             <div v-else class="edit-hint">点击编辑</div> -->
           </div>
+        <van-popup
+          v-model:show="showLevelPopover"
+          round
+          position="center"
+          :style="{ width: '280px', padding: '24px' }"
+        >
+          <div class="level-header">
+            <span class="current-score">{{ currentPoints }} 分</span>
+            
+          </div>
+
+          <div class="progress-bar">
+            <img :src="getLevelIcon(prevLevel.points)" class="level-thumb" />
+            <div class="track">
+              <div class="fill" :style="{ width: progress + '%' }"></div>
+            </div>
+            <img :src="getLevelIcon(nextLevel.points)" class="level-thumb" />
+          </div>
+
+          <div class="level-list">
+            <div
+              v-for="item in levelList.slice(1)"
+              :key="item.level"
+              class="level-row"
+              :class="{ active: item.level === curLevel }"
+            >
+              <img :src="getLevelIcon(item.points)" class="level-icon" />
+              <span class="level-name">Lv.{{ item.level }}</span>
+              <span class="level-points">{{ item.points }}分</span>
+            </div>
+          </div>
+      </van-popup>
           <div class="profile-info">
             <div class="nickname-container">
               <div v-if="!isEditingNickname" class="nickname" :class="{ 'disabled-nickname': !paymentStore.isPaid }"
@@ -134,6 +173,7 @@ import { useLikeStore } from '@/store/likeStore';
 import TabBar from '@/components/TabBar.vue';
 import Compressor from 'compressorjs';
 import { usePaymentStore } from '@/store/paymentStore'; 
+import { getLevelIcon } from '@/utils/levelIcon';
 
 // 导入图标
 import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
@@ -166,6 +206,38 @@ const showPhotoPopup = ref(false);
 const fileList = ref<any[]>([]);
 const userPhotos = ref<string[]>([]);
 const recentVisitorsCount = ref(0);
+
+const levelList = [
+  { level: 1, points: 0 },
+  { level: 2, points: 30 },
+  { level: 3, points: 100 },
+  { level: 4, points: 300 },
+  { level: 5, points: 1000 },
+  { level: 6, points: 3000 },
+];
+
+const currentPoints = computed(() => userInfoStore.profile?.points ?? 0);
+
+const curLevel = computed(() => {
+  const p = currentPoints.value;
+  if (p >= 3000) return 6;
+  if (p >= 1000) return 5;
+  if (p >= 300)  return 4;
+  if (p >= 100)  return 3;
+  if (p >= 30)   return 2;
+  return 1;            // 0 或 null 都归 Lv1
+});
+
+
+const prevLevel = computed(() => levelList[curLevel.value - 1]);
+const nextLevel = computed(() => levelList[Math.min(curLevel.value, 5)]);
+const progress = computed(() => {
+  if (curLevel.value === 6) return 100;
+  const prev = prevLevel.value.points;
+  const next = nextLevel.value.points;
+  return ((currentPoints.value - prev) / (next - prev)) * 100;
+});
+const showLevelPopover = ref(false);
 
 
 const showRejectionNotice = ref(false);
@@ -908,5 +980,86 @@ const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 .van-notice-bar {
   margin-bottom: 8px;
   border-radius: 8px;
+}
+
+.level-below {
+  display: block;
+  width: 36px;
+  height: 20px;
+  margin: 6px auto 0;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.2));
+  cursor: pointer;
+}
+
+.level-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.current-score {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+}
+.level-range {
+  font-size: 13px;
+  color: #666;
+}
+
+.progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.level-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(0,0,0,.1);
+}
+.track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #f0f0f0;
+  position: relative;
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff9a9e 0%, #fad0c4 100%);
+  border-radius: 3px;
+  transition: width .3s ease;
+}
+
+.level-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-radius: 4px;
+}
+.level-row.active {
+  background: #ffecef;
+}
+.level-icon {
+  width: 20px;
+  height: 20px;
+}
+.level-name {
+  flex: 1;
+  font-size: 14px;
+}
+.level-points {
+  font-size: 12px;
+  color: #888;
 }
 </style>

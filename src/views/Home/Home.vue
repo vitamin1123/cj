@@ -193,7 +193,7 @@
                   </div>
                 </div>
                 <div class="info-line">
-                  <div class="info-value">{{ getBirthYear(user.birth_date)+'年' }}</div>
+                  <div class="info-value">{{ getBirthYear(user.birth_date)+'年' }}<img :src="getLevelIcon(user.points)" style="width:36px;height:20px;margin-left:2px;vertical-align:-4px;" /></div>
                 </div>
                 <div class="desc">{{ truncateMemo(user.mem, 36) }}</div>
               </div>
@@ -230,6 +230,8 @@ import douyinQr from '@/assets/images/douyin_qr.png';
 import wechatQr from '@/assets/images/wechat_qr.png';
 import RewardPopup from '@/components/RewardPopup.vue';
 import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
+import { getLevelIcon } from '@/utils/levelIcon';
+
 
 const showRewardPopup = ref(false);
 const showQR   = ref(false);
@@ -259,6 +261,8 @@ const currentUserGender = userStore.profile?.gender;
     currentUserGender === 'male' ? user.gender === 'female' : user.gender === 'male'
   );
 });
+
+
 
 // 新增方法：从生日获取年份
 const getBirthYear = (birthDate: string) => {
@@ -333,7 +337,7 @@ const initializeUserData = async () => {
   try {
     await userListStore.initializeStore();
     await userStore.fetchUserProfile();
-    await likeStore.fetchLikes();
+    // await likeStore.fetchLikes();
   } catch (error) {
     console.error('用户数据初始化失败:', error);
   }
@@ -679,12 +683,34 @@ const goToDetail = (id: number) => {
   width: 100%;
   height: 243px; /* 调整为正方形比例 */
   overflow: hidden;
+  position: relative;
 }
 
 .card-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.level-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+.level-badge img {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
 .card-content {

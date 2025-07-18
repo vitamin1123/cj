@@ -15,26 +15,34 @@
     <div class="content">
       <div class="profile-card scroll-animate">
         <div class="avatar-section">
-          <img
-            v-if="userInfo.avatar"
-            :src="`/avatars/${userInfo.avatar}`"
-            class="avatar"
-          />
-          <img
-            v-else
-            :src="getDefaultAvatarUrl()"
-            class="avatar"
-          />
-          
-          <div class="basic-info">
-            <h2 class="name">{{ userInfo.nickname || '未设置昵称' }}</h2>
-            <div class="info-row">
-              <span class="birth-year">{{ displayBirthYear }}</span>
-              <span class="height">{{ userInfo.height || '--' }}cm</span>
-              <span class="constellation">{{ displayConstellation }}</span>
-            </div>
-          </div>
-        </div>
+  <div class="avatar-container">
+    <img
+      v-if="userInfo.avatar"
+      :src="`/avatars/${userInfo.avatar}`"
+      class="avatar"
+    />
+    <img
+      v-else
+      :src="getDefaultAvatarUrl()"
+      class="avatar"
+    />
+    <!-- 等级徽章：以头像为参照 -->
+    <img
+      class="level-badge"
+      :src="getLevelIcon(userInfo.points ?? 0)"
+      alt="level"
+    />
+  </div>
+
+  <div class="basic-info">
+    <h2 class="name">{{ userInfo.nickname || '未设置昵称' }}</h2>
+    <div class="info-row">
+      <span class="birth-year">{{ displayBirthYear }}</span>
+      <span class="height">{{ userInfo.height || '--' }}cm</span>
+      <span class="constellation">{{ displayConstellation }}</span>
+    </div>
+  </div>
+</div>
       </div>
 
       <div class="info-section scroll-animate">
@@ -190,6 +198,7 @@ import { likeUser } from '@/api/like';
 import { useLikeStore } from '@/store/likeStore';
 import { useUrlStore } from '@/store/urlStore'
 import { initWechatSDK, setWechatShareInfo } from '@/utils/wechat';
+import { getLevelIcon } from '@/utils/levelIcon';
 
 const showShareGuide = ref(false); // 控制扇形遮罩引导
 const likeStore = useLikeStore();
@@ -889,6 +898,25 @@ onMounted(() => {
   50% {
     opacity: 0.7;
   }
+}
+
+.avatar-container {
+  position: relative;
+  width: 80px;      /* 与头像同宽高 */
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.level-badge {
+  position: absolute;
+  top: -4px;        /* 向上微移，叠出边缘 */
+  right: -4px;      /* 向右微移，叠出边缘 */
+  width: 36px;
+  height: 20px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.2);
+  z-index: 2;
+  pointer-events: none;
 }
 
 </style>

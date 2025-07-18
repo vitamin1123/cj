@@ -155,7 +155,7 @@
                 </div>
               </div>
               <div class="height-container">
-                <div class="height">{{ person.birthYear }}年 {{ person.zodiac }}</div>
+                <div class="height">{{ person.birthYear }}年 {{ person.zodiac }}<img :src="getLevelIcon(person.points)" style="width:36px;height:20px;margin-left:2px;vertical-align:-4px;" /></div>
               </div>
               <div class="info-row">
                 <div class="desc" v-html="person.occupation || '未知职业'"></div>
@@ -244,6 +244,7 @@ import { useLikeStore } from '@/store/likeStore';
 import { useExploreStore } from '@/store/exploreStore';
 import { debounce } from 'lodash-es';
 import { processInBatches } from '@/utils/batch'; 
+import { getLevelIcon } from '@/utils/levelIcon';
 
 const exploreStore = useExploreStore();
 
@@ -412,6 +413,7 @@ interface Person {
   avatar?: string;
   photo?: string;
   memMatch?: [number, number];
+  points: number;
   // 其他可能的字段
   [key: string]: any; // 允许其他动态字段，但尽量明确
 }
@@ -755,7 +757,8 @@ const loadUserProfiles = async () => {
         avatar: profile.avatar,
         photo: profile.photo,
         liked: likeStore.hasLiked(profile.id),
-        isNew: false
+        isNew: false,
+        points: profile.points,
       };
     });
 

@@ -10,6 +10,7 @@ export interface AdminUser {
   is_top: boolean;
   state: number;
   expire_at: string;
+  points: number;
 }
 
 interface UpdateStatusRequest {

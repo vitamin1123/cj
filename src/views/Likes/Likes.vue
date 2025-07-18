@@ -29,7 +29,9 @@
           <div class="card-content">
             <div class="name">{{ person.nickname || `用户${person.id}` }}</div>
             <div class="height-container">
-              <div class="height">{{ person.height }}cm</div>
+              <div class="height">{{ person.birthYear }}年
+                <img :src="getLevelIcon(person.points)" style="width:36px;height:20px;margin-left:2px;vertical-align:-4px;" />
+              </div>
               <div class="heart-icon" @click.stop="confirmRemoveLike(person)">
                 <van-icon name="like" class="liked" />
               </div>
@@ -52,7 +54,9 @@
           <div class="card-content">
             <div class="name">{{ person.nickname || `用户${person.id}` }}</div>
             <div class="height-container">
-              <div class="height">{{ person.height }}cm</div>
+              <div class="height">{{ person.birthYear }}年
+                <img :src="getLevelIcon(person.points)" style="width:36px;height:20px;margin-left:2px;vertical-align:-4px;" /></div>
+              
               <!-- 喜欢我的列表不显示红心 -->
             </div>
             <div class="desc">{{ formatDescription(person.mem) }}</div>
@@ -91,12 +95,14 @@ import { useLikeStore } from '@/store/likeStore';
 import { useUserListStore } from '@/store/userList';
 import TabBar from '@/components/TabBar.vue';
 import { likeUser } from '@/api/like';
+import { getLevelIcon } from '@/utils/levelIcon';
 // 导入图标
 import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
 
 // 定义 LikedPerson 接口
 interface LikedPerson {
   id: number;
+  birthYear?: number;
   nickname?: string;
   gender: string;
   height: number;
@@ -104,6 +110,7 @@ interface LikedPerson {
   created_at: string; // 点赞时间
   avatar?: string;
   photo?: string;
+  points: number;
 }
 
 // 定义 Filter 接口
@@ -152,7 +159,11 @@ const likedPeople = computed<LikedPerson[]>(() => {
       mem: user.mem || '',
       created_at: createdAt || '',
       avatar: user.avatar,
-      photo: user.photo
+      photo: user.photo,
+      points: user.points || 0,
+      birthYear: user.birth_date 
+        ? new Date(user.birth_date).getFullYear() 
+        : 0
     };
   });
 });
@@ -171,7 +182,11 @@ const likedByPeople = computed<LikedPerson[]>(() => {
       mem: user.mem || '',
       created_at: createdAt || '',
       avatar: user.avatar,
-      photo: user.photo
+      photo: user.photo,
+      points: user.points || 0,
+      birthYear: user.birth_date 
+        ? new Date(user.birth_date).getFullYear() 
+        : 0
     };
   });
 });

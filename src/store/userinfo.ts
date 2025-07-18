@@ -22,6 +22,7 @@ interface UserProfile {
   avatar: string
   avatar_url: string
   photo: string
+  points: number
 }
 
 export const useUserInfoStore = defineStore('userInfo', () => {
