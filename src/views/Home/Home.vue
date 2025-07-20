@@ -73,7 +73,7 @@
           scrollable
           class="notice-bar"
         >
-          欢迎来到天顺，祝您早日找到心仪的另一半！❤️
+          {{ slogan }}
         </van-notice-bar>
       </div>
 
@@ -236,7 +236,7 @@ import { getLevelIcon } from '@/utils/levelIcon';
 const showRewardPopup = ref(false);
 const showQR   = ref(false);
 const qrTriggerRef = ref<HTMLElement | null>(null);
-
+const slogan = ref("欢迎来到天顺，祝您早日找到心仪的另一半！❤️");
 const exploreStore = useExploreStore();
 const userStore = useUserInfoStore()
 const userListStore = useUserListStore()
@@ -262,7 +262,14 @@ const currentUserGender = userStore.profile?.gender;
   );
 });
 
-
+const fetchSlogan = async () => {
+  try {
+    const res = await apiClient.get('/api/slogan-latest');
+    slogan.value = res.data.slogan;
+  } catch (error) {
+    console.error('获取标语失败:', error);
+  }
+};
 
 // 新增方法：从生日获取年份
 const getBirthYear = (birthDate: string) => {
@@ -362,6 +369,7 @@ const fetchDynamicMenu = async () => {
 }
 
 onMounted(async() => {
+  await fetchSlogan(); // ✅ 获取标语
   exploreStore.loadState();
   await checkAuth();
   await fetchNewcomers();

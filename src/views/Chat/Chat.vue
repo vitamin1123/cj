@@ -71,9 +71,9 @@
       @click="sendMessage"
       class="send-button"
       :icon="sendIcon"
-
+      :disabled="isSendingBlocked"
     >
- 
+      {{ isSendingBlocked ? `${countdown}s` : '' }}
     </van-button>
     </div>
   </div>
@@ -90,8 +90,22 @@ import dayjs from 'dayjs';
 import sendIcon from '@/assets/icons/send.svg';
 import { showFailToast } from 'vant';
 import { v4 as uuidv4 } from 'uuid';
+const lastSendTime = ref(0);
+const isSendingBlocked = ref(false);
+const countdown = ref(0);
+let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
-
+const startCountdown = () => {
+  countdown.value = 2;
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    countdown.value--;
+    if (countdown.value <= 0) {
+      clearInterval(countdownInterval!);
+      countdownInterval = null;
+    }
+  }, 1000);
+};
 
 const showRevokeConfirm = ref(false);
 const selectedMessage = ref<any>(null);
@@ -220,6 +234,8 @@ const addMessage = (text: string, isSent: boolean, id: string) => {
 
 // 发送消息
 const sendMessage = () => {
+const now = Date.now();
+  if (now - lastSendTime.value < 2000) return;
   if (newMessage.value.trim()) {
     const messageId = uuidv4();
 
@@ -236,6 +252,14 @@ const sendMessage = () => {
     send(JSON.stringify(messageData));
     // 清空输入框
     newMessage.value = '';
+
+    lastSendTime.value = now;
+    isSendingBlocked.value = true;
+
+    // 2秒后恢复
+    setTimeout(() => {
+      isSendingBlocked.value = false;
+    }, 2000);
   }
 };
 
@@ -317,6 +341,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   close();
+  if (countdownInterval) clearInterval(countdownInterval);
 });
 </script>
 

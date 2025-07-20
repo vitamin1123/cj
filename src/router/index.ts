@@ -92,6 +92,13 @@ const router = createRouter({
       meta: { title: '喜欢' }
     },
     {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/Settings/Settings.vue'),
+      meta: { title: '设置', requiresAuth: true}
+
+    },
+    {
       path: '/profile-setup',
       name: 'ProfileSetup',
       component: () => import('@/views/ProfileSetup/ProfileSetup.vue')

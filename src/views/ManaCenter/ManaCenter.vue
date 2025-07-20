@@ -21,10 +21,19 @@
             <van-icon name="records-o" size="14" color="#6A6A6A" />
             <span class="stat-title">最近注册人数</span>
           </div>
-          <div class="stat-value">248</div>
+          <div class="stat-value">{{ formatNumber(newRegistrations.count) }}</div>
           <div class="stat-trend">
-            <van-icon name="arrow-up" size="12" color="#07C160" />
-            <span class="trend-text positive">12.5%</span>
+            <van-icon 
+              :name="newRegistrations.growth_rate >= 0 ? 'arrow-up' : 'arrow-down'" 
+              size="12" 
+              :color="newRegistrations.growth_rate >= 0 ? '#07C160' : '#EE0A24'" 
+            />
+            <span 
+              class="trend-text" 
+              :class="newRegistrations.growth_rate >= 0 ? 'positive' : 'negative'"
+            >
+              {{ formatGrowthRate(newRegistrations.growth_rate) }}
+            </span>
           </div>
         </div>
 
@@ -34,10 +43,19 @@
             <van-icon name="cash-back-record" size="14" color="#6A6A6A" />
             <span class="stat-title">累计打赏数量</span>
           </div>
-          <div class="stat-value">1,426</div>
+          <div class="stat-value">{{ formatNumber(tipStats.total) }}</div>
           <div class="stat-trend">
-            <van-icon name="arrow-up" size="12" color="#07C160" />
-            <span class="trend-text positive">8.3%</span>
+            <van-icon 
+              :name="tipStats.growth_rate >= 0 ? 'arrow-up' : 'arrow-down'" 
+              size="12" 
+              :color="tipStats.growth_rate >= 0 ? '#07C160' : '#EE0A24'" 
+            />
+            <span 
+              class="trend-text" 
+              :class="tipStats.growth_rate >= 0 ? 'positive' : 'negative'"
+            >
+              {{ formatGrowthRate(tipStats.growth_rate) }}
+            </span>
           </div>
         </div>
       </div>
@@ -56,12 +74,12 @@
         </div>
         
         <!-- 数据统计 -->
-        <div class="menu-card" @click="navigateTo('analytics')">
+        <!-- <div class="menu-card" @click="navigateTo('analytics')">
           <div class="menu-icon">
             <van-icon name="chart-trending-o" size="24" color="#6A6A6A" />
           </div>
           <div class="menu-title">数据统计</div>
-        </div>
+        </div> -->
         
         <!-- 系统设置 -->
         <div class="menu-card" @click="navigateTo('settings')">
@@ -115,6 +133,7 @@ import type { EChartsCoreOption } from 'echarts/core';
 import { LineChart } from 'echarts/charts'; // 改为LineChart
 import { useAuthStore } from '@/store/authStore';
 import { useManaStore } from '@/store/manaStore'
+import apiClient from '@/plugins/axios';
 import { ALL_TABS, ICON_MAP, type TabItem, type IconType, type DynamicTabItem } from '@/config/tabs'
 import { 
   GridComponent, 
@@ -142,104 +161,97 @@ const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 // 登录图表引用
 const loginChart = ref<HTMLDivElement | null>(null);
 
+const loginStats = ref<any[]>([]);
+const tipStats = ref({ total: 0, growth_rate: 0 });
+const newRegistrations = ref({ count: 0, growth_rate: 0 });
+
+// 获取统计数据
+const fetchStats = async () => {
+  try {
+    const [loginRes, tipRes, regRes] = await Promise.all([
+      apiClient.get('/api/admin/login-stats?days=7'),
+      apiClient.get('/api/admin/tip-stats'),
+      apiClient.get('/api/admin/new-registrations')
+    ]);
+
+    loginStats.value = loginRes.data || [];
+    tipStats.value = tipRes.data || { total: 0, growth_rate: 0 };
+    newRegistrations.value = regRes.data || { count: 0, growth_rate: 0 };
+  } catch (error) {
+    console.error('获取统计数据失败:', error);
+  }
+};
+
 // 初始化图表
 const initLoginChart = () => {
   if (!loginChart.value) return;
-  
   const chart = echarts.init(loginChart.value);
-  
+
   const option: EChartsCoreOption = {
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(107, 107, 107, 0.9)',
       padding: 8,
-      textStyle: {
-        fontSize: 12,
-        color: '#fff'
-      }
+      textStyle: { fontSize: 12, color: '#fff' }
     },
     grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      top: '10%',
-      containLabel: true
+      left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true
     },
     xAxis: {
       type: 'category',
-      data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      axisLine: {
-        lineStyle: {
-          color: '#D9D9D9'
-        }
-      },
-      axisLabel: {
-        color: '#6A6A6A',
-        fontSize: 10
-      }
+      data: loginStats.value.map(item => item.date),
+      axisLine: { lineStyle: { color: '#D9D9D9' } },
+      axisLabel: { color: '#6A6A6A', fontSize: 10 }
     },
     yAxis: {
       type: 'value',
       min: 0,
-      max: 800,
-      axisLine: {
-        show: false
-      },
-      axisTick: {
-        show: false
-      },
-      splitLine: {
-        lineStyle: {
-          color: 'rgba(217, 217, 217, 0.2)'
-        }
-      },
-      axisLabel: {
-        color: '#6A6A6A',
-        fontSize: 10
-      }
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(217, 217, 217, 0.2)' } },
+      axisLabel: { color: '#6A6A6A', fontSize: 10 }
     },
-    series: [
-      {
-        name: '登录人数',
-        type: 'line', // 改为折线图
-        data: [320, 452, 601, 534, 489, 683, 792],
-        smooth: true, // 平滑曲线
-        symbol: 'circle', // 数据点显示为圆形
-        symbolSize: 6, // 数据点大小
-        lineStyle: {
-          width: 3,
-          color: '#5470C6' // 线条颜色
-        },
-        itemStyle: {
-          color: '#5470C6' // 数据点颜色
-        },
-        areaStyle: { // 添加面积填充效果
-          color: {
-            type: 'linear',
-            x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [{
-              offset: 0, color: 'rgba(84, 112, 198, 0.3)'
-            }, {
-              offset: 1, color: 'rgba(84, 112, 198, 0.05)'
-            }]
-          }
+    series: [{
+      name: '登录人数',
+      type: 'line',
+      data: loginStats.value.map(item => item.count),
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: 3, color: '#5470C6' },
+      itemStyle: { color: '#5470C6' },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(84, 112, 198, 0.3)' },
+            { offset: 1, color: 'rgba(84, 112, 198, 0.05)' }
+          ]
         }
       }
-    ]
+    }]
   };
-  
+
   chart.setOption(option);
-  
-  // 响应窗口大小变化
+
   const resizeHandler = () => chart.resize();
   window.addEventListener('resize', resizeHandler);
-  
-  // 组件卸载时清理
   onUnmounted(() => {
     window.removeEventListener('resize', resizeHandler);
     chart.dispose();
   });
 };
+
+// 格式化数字
+const formatNumber = (num: number) => num.toLocaleString();
+
+// 格式化增长率
+const formatGrowthRate = (rate: number) => {
+  const sign = rate >= 0 ? '+' : '';
+  return `${sign}${rate.toFixed(1)}%`;
+};
+
 
 // 导航到指定页面
 const navigateTo = (route: string) => {
@@ -247,7 +259,8 @@ const navigateTo = (route: string) => {
 };
 
 // 组件挂载后初始化图表
-onMounted(() => {
+onMounted(async() => {
+  await fetchStats();
   initLoginChart();
   manaStore.fetchPendingAudit();
 });
