@@ -148,35 +148,72 @@ export const useUserListStore = defineStore(
     const fetchIncrementalUserList = async (since: string): Promise<void> => {
       isLoading.value = true;
       error.value = null;
+
       try {
-        const response = await apiClient.get<UserListResponse>(
-          `/api/explore_people_updated_dic?since=${since}`
-        );
-        
-        if (response.status === 200 && response.data) {
-          const rawData = response.data.people;
-          
-          // 合并/更新现有用户数据
-          Object.entries(rawData).forEach(([key, user]) => {
-            const userId = parseInt(key, 10);
-            if (!isNaN(userId)) {
-              usersById.value[userId] = user;
-            }
-          });
-          
-          // 重新排序并更新有序ID数组
-          sortedIds.value = sortUserIds(usersById.value);
-          lasttime.value = response.data.lasttime;
-          
-          console.log(`成功更新 ${Object.keys(rawData).length} 条用户数据`);
-        }
+        const response = await apiClient.post<{
+          updates: Record<number, User>;
+          removed: number[];
+          serverLasttime: string;
+        }>(`/api/explore_people_updated_dic`, {since});
+
+        const { updates, removed, serverLasttime } = response.data;
+
+        // ✅ 1. 合并更新/新增（含被启用用户）
+        Object.entries(updates).forEach(([idStr, user]) => {
+          const id = parseInt(idStr, 10);
+          usersById.value[id] = user;
+        });
+
+        // ✅ 2. 移除过期/禁用用户
+        removed.forEach((id) => {
+          delete usersById.value[id];
+        });
+
+        // ✅ 3. 重新排序
+        sortedIds.value = sortUserIds(usersById.value);
+        lasttime.value = serverLasttime;
+
+        console.log(`增量更新：${Object.keys(updates).length} 条新增/更新，${removed.length} 条移除`);
       } catch (err) {
-        error.value = '获取增量用户列表失败';
-        console.error('Failed to fetch incremental user list:', err);
+        error.value = '获取增量更新失败';
+        console.error(err);
       } finally {
         isLoading.value = false;
       }
     };
+
+    // const fetchIncrementalUserList = async (since: string): Promise<void> => {
+    //   isLoading.value = true;
+    //   error.value = null;
+    //   try {
+    //     const response = await apiClient.get<UserListResponse>(
+    //       `/api/explore_people_updated_dic?since=${since}`
+    //     );
+        
+    //     if (response.status === 200 && response.data) {
+    //       const rawData = response.data.people;
+          
+    //       // 合并/更新现有用户数据
+    //       Object.entries(rawData).forEach(([key, user]) => {
+    //         const userId = parseInt(key, 10);
+    //         if (!isNaN(userId)) {
+    //           usersById.value[userId] = user;
+    //         }
+    //       });
+          
+    //       // 重新排序并更新有序ID数组
+    //       sortedIds.value = sortUserIds(usersById.value);
+    //       lasttime.value = response.data.lasttime;
+          
+    //       console.log(`成功更新 ${Object.keys(rawData).length} 条用户数据`);
+    //     }
+    //   } catch (err) {
+    //     error.value = '获取增量用户列表失败';
+    //     console.error('Failed to fetch incremental user list:', err);
+    //   } finally {
+    //     isLoading.value = false;
+    //   }
+    // };
     
     const initializeStore = async (): Promise<void> => {
       try {

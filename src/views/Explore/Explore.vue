@@ -65,6 +65,29 @@
               </div>
             </div>
 
+            <!-- 是否已婚 #d75670 -->
+<div class="search-option-item">
+  <div class="option-label">婚姻</div>
+  <div class="option-input">
+    <van-radio-group v-model="marriedFilter" direction="horizontal" @change="handleSearch">
+      <van-radio name="" checked-color="#cccccc">全部</van-radio>
+      <van-radio :name="0" checked-color="#d75670">未婚</van-radio>
+      <van-radio :name="1" checked-color="#d75670">已婚</van-radio>
+    </van-radio-group>
+  </div>
+</div>
+
+<!-- 是否有小孩 -->
+<div class="search-option-item">
+  <div class="option-label">小孩</div>
+  <div class="option-input">
+    <van-radio-group v-model="childFilter" direction="horizontal" @change="handleSearch">
+      <van-radio name="" checked-color="#cccccc">全部</van-radio>
+      <van-radio :name="0" checked-color="#d75670">无</van-radio>
+      <van-radio :name="1" checked-color="#d75670">有</van-radio>
+    </van-radio-group>
+  </div>
+</div>
 
 
 
@@ -257,7 +280,9 @@ const {
   endYear,
   selectedZodiacs,
   genderFilterState,
-  locationFilterActive
+  locationFilterActive,
+  marriedFilter, 
+  childFilter
 } = toRefs(exploreStore.state);
 
 
@@ -273,6 +298,7 @@ const showAreaPicker = ref(false);
 // 两个列表：全部数据和过滤后的数据
 const allPeopleList = ref<Person[]>([]);
 const filteredPeopleList = ref<Person[]>([]);
+
 // 虚拟列表相关
 // const container = ref<HTMLElement | null>(null);
 const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
@@ -282,7 +308,7 @@ const { list: virtualList, containerProps, wrapperProps } = useVirtualList(
     overscan: 2
   }
 );
-const peopleGridRef = containerProps.ref;
+const peopleGridRef = containerProps.ref; 
 // const scrollPosition = ref(0);
 
 const showBirthYearPicker = ref(false);
@@ -565,6 +591,16 @@ const handleSearch = () => {
         return false;
       }
     }
+
+        // 7. 婚姻状态
+    if (marriedFilter.value !== '') {
+      if ((person.married ?? 0) !== marriedFilter.value) return false;
+    }
+
+    // 8. 是否有小孩
+    if (childFilter.value !== '') {
+      if ((person.child ?? 0) !== childFilter.value) return false;
+    }
     
     // 6. 关键词搜索（只匹配mem字段）
     if (keyword) {
@@ -768,6 +804,8 @@ const loadUserProfiles = async () => {
         liked: likeStore.hasLiked(profile.id),
         isNew: false,
         points: profile.points,
+        married: profile.married,
+        child: profile.child,
       };
     });
 
@@ -807,14 +845,35 @@ const goToDetail = (id: number | string) => {
 
 const tabs = computed(() => [...ALL_TABS, ...authStore.menuItems]);
 const { y: liveScrollPosition } = useScroll(peopleGridRef, { throttle: 100 });
+// onActivated(async () => {
+//   console.log('ExploreView activated. Restoring scroll position from Pinia:', exploreScrollPosition.value);
+  
+//   await nextTick();
+//   await new Promise(resolve => setTimeout(resolve, 50));
+//   if (peopleGridRef.value) {
+//     // 6. 从 Pinia state 恢复滚动位置
+//     peopleGridRef.value.scrollTop = exploreScrollPosition.value;
+//   }
+// });
+
 onActivated(async () => {
-  console.log('ExploreView activated. Restoring scroll position from Pinia:', exploreScrollPosition.value);
+  console.log('ExploreView activated. Restoring scroll position:', exploreScrollPosition.value);
   
-  await nextTick();
-  
-  if (peopleGridRef.value) {
-    // 6. 从 Pinia state 恢复滚动位置
-    peopleGridRef.value.scrollTop = exploreScrollPosition.value;
+  // 确保容器存在
+  const ensureContainer = async (retry = 3): Promise<HTMLElement | null> => {
+    if (peopleGridRef.value) return peopleGridRef.value;
+    if (retry <= 0) return null;
+    
+    await new Promise(resolve => setTimeout(resolve, 50));
+    return ensureContainer(retry - 1);
+  };
+
+  const container = await ensureContainer();
+  if (container) {
+    container.scrollTop = exploreScrollPosition.value;
+    console.log('Scroll restored to:', exploreScrollPosition.value);
+  } else {
+    console.error('Scroll container not found after retries');
   }
 });
 
@@ -823,6 +882,8 @@ onDeactivated(() => {
   setExploreScrollPosition(liveScrollPosition.value);
   console.log(`ExploreView deactivated. Saved scroll position to Pinia: ${liveScrollPosition.value}`);
 });
+
+
 
 onMounted(async() => {
    const loaded = await loadUserProfiles();

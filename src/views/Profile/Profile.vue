@@ -130,6 +130,15 @@
               <span class="birth-year">{{ displayBirthYear }}</span>
               <span class="height">{{ userInfo.height || '--' }}cm</span>
               <span class="constellation">{{ displayConstellation }}</span>
+              
+            </div>
+            <div class="tag-row" v-if="userInfo.married !== undefined || userInfo.child !== undefined">
+              <span v-if="userInfo.married !== undefined" class="tag marriage" :class="userInfo.married ? 'married' : 'unmarried'">
+                {{ userInfo.married ? '已婚' : '未婚' }}
+              </span>
+              <span v-if="userInfo.child !== undefined" class="tag child" :class="userInfo.child ? 'has-child' : 'no-child'">
+                {{ userInfo.child ? '有小孩' : '无小孩' }}
+              </span>
             </div>
           </div>
         </div>
@@ -913,6 +922,37 @@ onMounted(() => {
 
 .like-item {
   justify-content: space-between;
+}
+
+.tag-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.marriage.married {
+  background-color: #e83e8c;
+}
+
+.marriage.unmarried {
+  background-color: #2c7be5;
+}
+
+.child.has-child {
+  background-color: #ff9800;
+}
+
+.child.no-child {
+  background-color: #4caf50;
 }
 
 </style>

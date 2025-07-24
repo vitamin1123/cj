@@ -1,0 +1,181 @@
+Date : 2025-07-18 17:28:28
+Directory : d:\workspace\cj
+Total : 111 files,  31301 codes, 551 comments, 2198 blanks, all 34050 lines
+
+Languages
++--------------------+------------+------------+------------+------------+------------+
+| language           | files      | code       | comment    | blank      | total      |
++--------------------+------------+------------+------------+------------+------------+
+| JSON               |          3 |     15,138 |          0 |          2 |     15,140 |
+| vue                |         24 |     13,471 |        196 |      1,812 |     15,479 |
+| TypeScript         |         34 |      1,720 |        240 |        273 |      2,233 |
+| Python             |          4 |        327 |         25 |         58 |        410 |
+| XML                |         35 |        309 |         81 |         14 |        404 |
+| Less               |          2 |        140 |          2 |          1 |        143 |
+| YAML               |          3 |        119 |          1 |         22 |        142 |
+| CSS                |          1 |         23 |          4 |          8 |         35 |
+| HTML               |          1 |         21 |          0 |          1 |         22 |
+| JSON with Comments |          1 |         15 |          0 |          1 |         16 |
+| JavaScript         |          1 |         13 |          1 |          2 |         16 |
+| Properties         |          1 |          4 |          1 |          2 |          7 |
+| Markdown           |          1 |          1 |          0 |          2 |          3 |
++--------------------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                            | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                               |        111 |     31,301 |        551 |      2,198 |     34,050 |
+| . (Files)                                                       |         12 |     15,283 |         18 |         21 |     15,322 |
+| .github                                                         |          3 |        119 |          1 |         22 |        142 |
+| .github\workflows                                               |          3 |        119 |          1 |         22 |        142 |
+| src                                                             |         96 |     15,899 |        532 |      2,155 |     18,586 |
+| src (Files)                                                     |          8 |        397 |         31 |         82 |        510 |
+| src\api                                                         |          4 |         61 |          7 |         14 |         82 |
+| src\assets                                                      |         36 |        439 |         83 |         15 |        537 |
+| src\assets (Files)                                              |         17 |        420 |         83 |         15 |        518 |
+| src\assets\icons                                                |         19 |         19 |          0 |          0 |         19 |
+| src\components                                                  |          3 |      1,035 |         15 |        148 |      1,198 |
+| src\config                                                      |          1 |         69 |          3 |          7 |         79 |
+| src\plugins                                                     |          3 |         90 |         31 |         27 |        148 |
+| src\router                                                      |          1 |        175 |         15 |         13 |        203 |
+| src\store                                                       |         12 |        971 |        117 |        157 |      1,245 |
+| src\types                                                       |          1 |         30 |          6 |          2 |         38 |
+| src\utils                                                       |          7 |        208 |         43 |         31 |        282 |
+| src\views                                                       |         20 |     12,424 |        181 |      1,659 |     14,264 |
+| src\views\AdminChat                                             |          1 |        840 |         17 |        129 |        986 |
+| src\views\Chat                                                  |          1 |        395 |          4 |         64 |        463 |
+| src\views\Detail                                                |          2 |      1,389 |          7 |        160 |      1,556 |
+| src\views\Explore                                               |          2 |      2,215 |         20 |        294 |      2,529 |
+| src\views\Home                                                  |          2 |      1,465 |         40 |        193 |      1,698 |
+| src\views\IndexView                                             |          1 |        421 |          8 |         54 |        483 |
+| src\views\Likes                                                 |          1 |        419 |          7 |         68 |        494 |
+| src\views\Mana                                                  |          1 |        502 |         15 |         63 |        580 |
+| src\views\ManaCenter                                            |          1 |        385 |         10 |         49 |        444 |
+| src\views\Moderation                                            |          1 |        261 |          3 |         32 |        296 |
+| src\views\ModerationDetail                                      |          1 |        484 |          7 |         54 |        545 |
+| src\views\NotFound404View                                       |          1 |         61 |          0 |         10 |         71 |
+| src\views\Payment                                               |          1 |        323 |          1 |         49 |        373 |
+| src\views\Profile                                               |          1 |        799 |         11 |        108 |        918 |
+| src\views\ProfileSetup                                          |          1 |      1,352 |         21 |        178 |      1,551 |
+| src\views\ReopenPage                                            |          1 |        182 |          0 |         30 |        212 |
+| src\views\userCenter                                            |          1 |        931 |         10 |        124 |      1,065 |
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| filename                                                        | language           | code       | comment    | blank      | total      |
++-----------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| d:\workspace\cj\.env                                            | Properties         |          4 |          1 |          2 |          7 |
+| d:\workspace\cj\.eslintrc.cjs                                   | JavaScript         |         13 |          1 |          2 |         16 |
+| d:\workspace\cj\.github\workflows\build.yml                     | YAML               |         25 |          0 |          7 |         32 |
+| d:\workspace\cj\.github\workflows\privew-deloy.yml              | YAML               |         58 |          0 |          5 |         63 |
+| d:\workspace\cj\.github\workflows\prview-build.yml              | YAML               |         36 |          1 |         10 |         47 |
+| d:\workspace\cj\.prettierrc.json                                | JSON               |          8 |          0 |          0 |          8 |
+| d:\workspace\cj\README.md                                       | Markdown           |          1 |          0 |          2 |          3 |
+| d:\workspace\cj\auto-imports.d.ts                               | TypeScript         |          4 |          6 |          1 |         11 |
+| d:\workspace\cj\components.d.ts                                 | TypeScript         |         42 |          6 |          2 |         50 |
+| d:\workspace\cj\env.d.ts                                        | TypeScript         |          0 |          1 |          1 |          2 |
+| d:\workspace\cj\index.html                                      | HTML               |         21 |          0 |          1 |         22 |
+| d:\workspace\cj\package-lock.json                               | JSON               |     15,059 |          0 |          1 |     15,060 |
+| d:\workspace\cj\package.json                                    | JSON               |         71 |          0 |          1 |         72 |
+| d:\workspace\cj\src\App.vue                                     | vue                |         12 |          0 |          5 |         17 |
+| d:\workspace\cj\src\api\admin.ts                                | TypeScript         |         38 |          1 |          6 |         45 |
+| d:\workspace\cj\src\api\chatApi.ts                              | TypeScript         |         10 |          3 |          6 |         19 |
+| d:\workspace\cj\src\api\index.ts                                | TypeScript         |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\api\like.ts                                 | TypeScript         |         12 |          3 |          2 |         17 |
+| d:\workspace\cj\src\assets\assets-empty.svg                     | XML                |          6 |          0 |          1 |          7 |
+| d:\workspace\cj\src\assets\assets-logo-full.svg                 | XML                |          7 |         40 |          5 |         52 |
+| d:\workspace\cj\src\assets\assets-product-1.svg                 | XML                |          6 |          0 |          1 |          7 |
+| d:\workspace\cj\src\assets\assets-product-2.svg                 | XML                |          6 |          0 |          1 |          7 |
+| d:\workspace\cj\src\assets\assets-product-3.svg                 | XML                |          6 |          0 |          1 |          7 |
+| d:\workspace\cj\src\assets\assets-product-4.svg                 | XML                |          6 |          0 |          1 |          7 |
+| d:\workspace\cj\src\assets\assets-result-403.svg                | XML                |         32 |          0 |          0 |         32 |
+| d:\workspace\cj\src\assets\assets-result-404.svg                | XML                |         36 |          0 |          0 |         36 |
+| d:\workspace\cj\src\assets\assets-result-500.svg                | XML                |         52 |          0 |          0 |         52 |
+| d:\workspace\cj\src\assets\assets-result-ie.svg                 | XML                |         33 |          0 |          0 |         33 |
+| d:\workspace\cj\src\assets\assets-result-maintenance.svg        | XML                |         48 |          0 |          1 |         49 |
+| d:\workspace\cj\src\assets\assets-result-wifi.svg               | XML                |         23 |          0 |          0 |         23 |
+| d:\workspace\cj\src\assets\assets-setting-auto.svg              | XML                |         12 |          0 |          1 |         13 |
+| d:\workspace\cj\src\assets\assets-setting-dark.svg              | XML                |          4 |          0 |          1 |          5 |
+| d:\workspace\cj\src\assets\assets-setting-light.svg             | XML                |         12 |          0 |          1 |         13 |
+| d:\workspace\cj\src\assets\assets-t-logo.svg                    | XML                |          1 |         41 |          0 |         42 |
+| d:\workspace\cj\src\assets\icons\compass-selected.svg           | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\compass.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\home-selected.svg              | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\home.svg                       | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\level_0.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\level_1.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\level_2.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\level_3.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\level_4.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\level_5.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\level_6.svg                    | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\like-selected.svg              | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\like.svg                       | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\mana-selected.svg              | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\mana.svg                       | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\send-pink.svg                  | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\send.svg                       | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\smile-selected.svg             | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\icons\smile.svg                      | XML                |          1 |          0 |          0 |          1 |
+| d:\workspace\cj\src\assets\reset.less                           | Less               |        130 |          2 |          1 |        133 |
+| d:\workspace\cj\src\components\RewardPopup copy.vue             | vue                |        477 |          7 |         68 |        552 |
+| d:\workspace\cj\src\components\RewardPopup.vue                  | vue                |        480 |          7 |         68 |        555 |
+| d:\workspace\cj\src\components\TabBar.vue                       | vue                |         78 |          1 |         12 |         91 |
+| d:\workspace\cj\src\config\tabs.ts                              | TypeScript         |         69 |          3 |          7 |         79 |
+| d:\workspace\cj\src\fuck.py                                     | Python             |        251 |         10 |         39 |        300 |
+| d:\workspace\cj\src\images.py                                   | Python             |         40 |         13 |         13 |         66 |
+| d:\workspace\cj\src\index.less                                  | Less               |         10 |          0 |          0 |         10 |
+| d:\workspace\cj\src\main.ts                                     | TypeScript         |         25 |          2 |         11 |         38 |
+| d:\workspace\cj\src\plugins\axios copy.ts                       | TypeScript         |         35 |          8 |         11 |         54 |
+| d:\workspace\cj\src\plugins\axios.ts                            | TypeScript         |         44 |         19 |         14 |         77 |
+| d:\workspace\cj\src\plugins\vconsole.ts                         | TypeScript         |         11 |          4 |          2 |         17 |
+| d:\workspace\cj\src\rename_images.py                            | Python             |         21 |          2 |          4 |         27 |
+| d:\workspace\cj\src\rename_tmp_files.py                         | Python             |         15 |          0 |          2 |         17 |
+| d:\workspace\cj\src\router\index.ts                             | TypeScript         |        175 |         15 |         13 |        203 |
+| d:\workspace\cj\src\store\authStore.ts                          | TypeScript         |         41 |          6 |         11 |         58 |
+| d:\workspace\cj\src\store\exploreStore.ts                       | TypeScript         |         44 |          7 |          8 |         59 |
+| d:\workspace\cj\src\store\index.ts                              | TypeScript         |          5 |          1 |          2 |          8 |
+| d:\workspace\cj\src\store\likeStore.ts                          | TypeScript         |         68 |         13 |         16 |         97 |
+| d:\workspace\cj\src\store\manaStore.ts                          | TypeScript         |         25 |          4 |          1 |         30 |
+| d:\workspace\cj\src\store\paymentStore.ts                       | TypeScript         |         33 |          1 |          3 |         37 |
+| d:\workspace\cj\src\store\urlStore.ts                           | TypeScript         |         27 |          6 |          6 |         39 |
+| d:\workspace\cj\src\store\userList copy 2.ts                    | TypeScript         |        235 |         31 |         38 |        304 |
+| d:\workspace\cj\src\store\userList copy.ts                      | TypeScript         |        187 |         25 |         30 |        242 |
+| d:\workspace\cj\src\store\userList.ts                           | TypeScript         |        231 |         13 |         35 |        279 |
+| d:\workspace\cj\src\store\userinfo.ts                           | TypeScript         |         64 |          4 |          6 |         74 |
+| d:\workspace\cj\src\store\viewState.ts                          | TypeScript         |         11 |          6 |          1 |         18 |
+| d:\workspace\cj\src\style.css                                   | CSS                |         23 |          4 |          8 |         35 |
+| d:\workspace\cj\src\types\components.d.ts                       | TypeScript         |         30 |          6 |          2 |         38 |
+| d:\workspace\cj\src\utils\authUtils.ts                          | TypeScript         |          9 |         12 |          4 |         25 |
+| d:\workspace\cj\src\utils\batch.ts                              | TypeScript         |         15 |          2 |          3 |         20 |
+| d:\workspace\cj\src\utils\clipboard.ts                          | TypeScript         |         26 |          3 |          2 |         31 |
+| d:\workspace\cj\src\utils\levelIcon.ts                          | TypeScript         |         18 |          0 |          4 |         22 |
+| d:\workspace\cj\src\utils\routeHistory.ts                       | TypeScript         |         12 |          5 |          3 |         20 |
+| d:\workspace\cj\src\utils\tabs.ts                               | TypeScript         |         38 |          0 |          1 |         39 |
+| d:\workspace\cj\src\utils\wechat.ts                             | TypeScript         |         90 |         21 |         14 |        125 |
+| d:\workspace\cj\src\views\AdminChat\AdminChat.vue               | vue                |        840 |         17 |        129 |        986 |
+| d:\workspace\cj\src\views\Chat\Chat.vue                         | vue                |        395 |          4 |         64 |        463 |
+| d:\workspace\cj\src\views\Detail\Detail copy.vue                | vue                |        568 |          1 |         65 |        634 |
+| d:\workspace\cj\src\views\Detail\Detail.vue                     | vue                |        821 |          6 |         95 |        922 |
+| d:\workspace\cj\src\views\Explore\Explore copy.vue              | vue                |      1,107 |         10 |        147 |      1,264 |
+| d:\workspace\cj\src\views\Explore\Explore.vue                   | vue                |      1,108 |         10 |        147 |      1,265 |
+| d:\workspace\cj\src\views\Home\Home copy.vue                    | vue                |        719 |         28 |         94 |        841 |
+| d:\workspace\cj\src\views\Home\Home.vue                         | vue                |        746 |         12 |         99 |        857 |
+| d:\workspace\cj\src\views\IndexView\IndexView.vue               | vue                |        421 |          8 |         54 |        483 |
+| d:\workspace\cj\src\views\Likes\Likes.vue                       | vue                |        419 |          7 |         68 |        494 |
+| d:\workspace\cj\src\views\ManaCenter\ManaCenter.vue             | vue                |        385 |         10 |         49 |        444 |
+| d:\workspace\cj\src\views\Mana\Mana.vue                         | vue                |        502 |         15 |         63 |        580 |
+| d:\workspace\cj\src\views\ModerationDetail\ModerationDetail.vue | vue                |        484 |          7 |         54 |        545 |
+| d:\workspace\cj\src\views\Moderation\Moderation.vue             | vue                |        261 |          3 |         32 |        296 |
+| d:\workspace\cj\src\views\NotFound404View\NotFound404View.vue   | vue                |         61 |          0 |         10 |         71 |
+| d:\workspace\cj\src\views\Payment\Payment.vue                   | vue                |        323 |          1 |         49 |        373 |
+| d:\workspace\cj\src\views\ProfileSetup\ProfileSetup.vue         | vue                |      1,352 |         21 |        178 |      1,551 |
+| d:\workspace\cj\src\views\Profile\Profile.vue                   | vue                |        799 |         11 |        108 |        918 |
+| d:\workspace\cj\src\views\ReopenPage\ReopenPage.vue             | vue                |        182 |          0 |         30 |        212 |
+| d:\workspace\cj\src\views\userCenter\userCenter.vue             | vue                |        931 |         10 |        124 |      1,065 |
+| d:\workspace\cj\tsconfig.json                                   | JSON with Comments |         15 |          0 |          1 |         16 |
+| d:\workspace\cj\vite.config.ts                                  | TypeScript         |         45 |          3 |          7 |         55 |
+| Total                                                           |                    |     31,301 |        551 |      2,198 |     34,050 |
++-----------------------------------------------------------------+--------------------+------------+------------+------------+------------+

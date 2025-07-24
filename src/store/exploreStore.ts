@@ -24,6 +24,8 @@ export const useExploreStore = defineStore('explore', () => {
     // 新增：存储filters的激活状态
     genderFilterState: 0 as 0 | 1 | 2, // 0-取消选中，1-只看男，2-只看女
     locationFilterActive: false,
+    marriedFilter: '',
+    childFilter :''
   });
 
   // 非持久化状态

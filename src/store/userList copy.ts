@@ -25,7 +25,9 @@ interface User {
   photo: string
   region_code: string
   weight: number
-  updated_at?:string
+  updated_at?:string,
+  married: number,
+  child: number,
 }
 
 interface UserListResponse {

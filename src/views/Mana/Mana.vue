@@ -233,7 +233,7 @@ const goBack = () => {
 
 // 格式化到期时间
 const formatExpireDate = (dateStr: string | null) => {
-  if (!dateStr) return '永久';
+  if (!dateStr) return '已到期';
   const date = new Date(dateStr);
   return date.toISOString().split('T')[0]+'到期';
 };

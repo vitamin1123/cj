@@ -41,6 +41,11 @@
       <span class="height">{{ userInfo.height || '--' }}cm</span>
       <span class="constellation">{{ displayConstellation }}</span>
     </div>
+    <!-- 婚姻 & 小孩标签 -->
+    <div class="tag-row" v-if="userInfo.married || userInfo.child">
+      <span v-if="userInfo.married" class="tiny-tag married-tag">已婚</span>
+      <span v-if="userInfo.child" class="tiny-tag child-tag">有小孩</span>
+    </div>
   </div>
 </div>
       </div>
@@ -917,6 +922,29 @@ onMounted(() => {
   box-shadow: 0 2px 6px rgba(0,0,0,.2);
   z-index: 2;
   pointer-events: none;
+}
+
+.tag-row {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.tiny-tag {
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: #fff;
+}
+
+.married-tag {
+  background-color: #ff7675;  /* 柔和红 */
+}
+
+.child-tag {
+  background-color: #74b9ff;  /* 柔和蓝 */
 }
 
 </style>
