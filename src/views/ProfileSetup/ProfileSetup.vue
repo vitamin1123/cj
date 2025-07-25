@@ -340,6 +340,7 @@
               label="手机号码"
               placeholder="请输入手机号码"
               input-align="center"
+              maxlength="11"
               :rules="[
                 { required: true, message: '请输入手机号码' }, 
                 { validator: phoneValidator, message: '请输入正确的手机号码' }
@@ -589,7 +590,7 @@ const heightValidator = (value: string | number) => {
 };
 
 const phoneValidator = (value: string) => {
-  const phoneRegex = /^1[3456789]\d{9}$/;
+  const phoneRegex = /^1[3-9]\d{9}$/;
   return phoneRegex.test(value);
 };
 

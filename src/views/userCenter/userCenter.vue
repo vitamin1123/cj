@@ -345,7 +345,7 @@ const fetchVisitCount = async () => {
     recentVisitorsCount.value = response.data.count;
   } catch (error) {
     console.error('获取最近来访数量失败', error);
-    showToast('获取数据失败');
+    //showToast('获取数据失败');
   }
 };
 

@@ -6,7 +6,7 @@ import { Lazyload } from 'vant'
 import 'vant/lib/index.css';
 import 'tdesign-vue-next/es/style/index.css';
 import '@/style.css';
-import { vConsolePlugin } from './plugins/vconsole';
+//import { vConsolePlugin } from './plugins/vconsole';
 
 
 const app = createApp(App)
@@ -33,5 +33,5 @@ app.use(Lazyload, {
   })
 
 
-app.use(vConsolePlugin); // 注册vConsole插件
+//app.use(vConsolePlugin); // 注册vConsole插件
 app.mount('#app')

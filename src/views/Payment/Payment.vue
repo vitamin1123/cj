@@ -1,6 +1,16 @@
 <!-- src/views/Payment/Payment.vue -->
 <template>
   <div class="payment-container">
+    <van-floating-bubble
+      v-model:offset="offset"
+      axis="xy"
+      magnetic="x"
+      icon="revoke"
+      :size="54"
+      :gap="10"
+      @click="goBack"
+      style="--van-floating-bubble-background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);"
+    />
     <div class="payment-content">
       <h1>开通会员，解锁全部功能</h1>
       <p>支付200元即可享受1年完整会员服务</p>
@@ -26,9 +36,9 @@
       
       
       
-      <div class="footer">
+      <!-- <div class="footer">
         <p>支付即表同意<a href="/terms">服务条款</a>和<a href="/privacy">隐私政策</a></p>
-      </div>
+      </div> -->
     </div>
     
     <div v-if="showSuccess" class="success-overlay">
@@ -54,7 +64,12 @@ const paymentStore = usePaymentStore();
 const loading = ref(false);
 const showSuccess = ref(false);
 const sdkReady = ref(false); // 跟踪SDK是否已初始化
+const offset = ref({ x: 0.05 * window.innerWidth, y: 0.03 * window.innerHeight });
+const goBack = () => {
 
+    router.replace('/home');
+
+};
 const benefits = [
   '无限制查看用户资料',
   '查看访客记录',
