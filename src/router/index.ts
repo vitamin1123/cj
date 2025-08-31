@@ -151,7 +151,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const paymentStore = usePaymentStore();
-  document.title = (to.meta?.title as string) ?? '自助功能';
+  document.title = (to.meta?.title as string) ?? '天顺陈姐';
   const urlStore = useUrlStore()
   
   // 构建完整URL（包含origin）

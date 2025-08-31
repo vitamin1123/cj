@@ -285,8 +285,8 @@
       <van-swipe-item>
         <div class="setup-card">
           <div class="card-icon">🙏</div>
-          <h2 class="card-title">信仰</h2>
-          <p class="card-subtitle">你的宗教信仰(可选)</p>
+          <h2 class="card-title">信仰（可选）</h2>
+          <p class="card-subtitle">你的宗教信仰</p>
           <div class="input-container">
             <van-field
   v-model="formData.religionText"
@@ -311,7 +311,7 @@
       <van-swipe-item>
         <div class="setup-card">
           <div class="card-icon">🧠</div>
-          <h2 class="card-title">MBTI人格</h2>
+          <h2 class="card-title">MBTI人格（可选）</h2>
           <p class="card-subtitle">你的人格类型</p>
           <div class="mbti-options">
             <div 

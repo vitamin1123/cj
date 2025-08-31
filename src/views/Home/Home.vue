@@ -1,7 +1,7 @@
 <template>
   <div class="home-container">
     <!-- 骨架屏 - 完全使用 Vant4 Skeleton 重构 -->
-    <div v-if="isLoading" class="skeleton-container">
+    <div v-if="isLoading || !isReady" class="skeleton-container">
       <!-- 搜索框骨架 -->
       <van-skeleton 
         :row="1" 
@@ -250,14 +250,26 @@ const likeStore = useLikeStore();
 const newcomers = ref<any[]>([]);
 const isNewcomersLoading = ref(true); 
 const recommendedUsers = ref<any[]>([]);
+const isReady = ref(false); 
 
-const filteredRecommendedUsers = computed(() => {
+const filteredRecommendedUsers_old = computed(() => {
   if (!recommendedUsers.value.length) return [];
   
 const currentUserGender = userStore.profile?.gender;
   if (!currentUserGender) return recommendedUsers.value;
   
   return recommendedUsers.value.filter(user => 
+    currentUserGender === 'male' ? user.gender === 'female' : user.gender === 'male'
+  );
+});
+
+const filteredRecommendedUsers = computed(() => {
+  if (!recommendedUsers.value.length) return [];
+
+  const currentUserGender = userStore.profile?.gender;
+  if (currentUserGender === undefined) return []; // ✅ 等待 gender 加载完成
+
+  return recommendedUsers.value.filter(user =>
     currentUserGender === 'male' ? user.gender === 'female' : user.gender === 'male'
   );
 });
@@ -299,6 +311,18 @@ const checkAuth = async () => {
     authError.value = error.message || '认证检查失败，请稍后重试。';
   } finally {
     isLoading.value = false;
+  }
+};
+
+const checkFirstTimeUser = async () => {
+  try {
+    const res = await apiClient.get('/api/check/user_first');
+    if (res.data.result === 0) {
+      // 首次使用，跳转到登记页
+      router.replace('/profile-setup');
+    }
+  } catch (error) {
+    console.error('检查用户首次状态失败:', error);
   }
 };
 
@@ -368,30 +392,69 @@ const fetchDynamicMenu = async () => {
   }
 }
 
-onMounted(async() => {
-  await fetchSlogan(); // ✅ 获取标语
-  exploreStore.loadState();
-  await checkAuth();
-  await fetchNewcomers();
-  await fetchInter()
-  // console.log('authStore.token: ',authStore.token)
-  if (authStore.token) {
-    const dynamicTabs = await fetchDynamicMenu()
-    authStore.setMenuItems(dynamicTabs)
-    // 检查支付状态（如果尚未加载）
-    if (!paymentStore.isPaid && !paymentStore.loading) {
-      try {
-        await paymentStore.checkPaymentStatus();
-      } catch (error) {
-        console.error('支付状态检查失败:', error);
+// onMounted(async() => {
+  
+//   exploreStore.loadState();
+//   await checkAuth();
+//   console.log('首页加载',authStore.token)
+//   if (authStore.token) {
+//     await checkFirstTimeUser(); // 👈 加在这里
+//   }
+//   await fetchSlogan(); // ✅ 获取标语
+//   await fetchNewcomers();
+//   await fetchInter()
+//   // console.log('authStore.token: ',authStore.token)
+//   if (authStore.token) {
+//     const dynamicTabs = await fetchDynamicMenu()
+//     authStore.setMenuItems(dynamicTabs)
+//     // 检查支付状态（如果尚未加载）
+//     if (!paymentStore.isPaid && !paymentStore.loading) {
+//       try {
+//         await paymentStore.checkPaymentStatus();
+//       } catch (error) {
+//         console.error('支付状态检查失败:', error);
+//       }
+//     }
+//     console.log('tabs: ',tabs.value)
+
+//     // 如果已支付，立即初始化用户数据
+//     if (paymentStore.isPaid) {
+//       await initializeUserData();
+//     }
+//   }
+// });
+
+onMounted(async () => {
+  isLoading.value = true;
+  isReady.value = false;
+
+  try {
+    await fetchSlogan();
+    exploreStore.loadState();
+    await checkAuth();
+
+    if (authStore.token) {
+      await checkFirstTimeUser(); // 跳转 profile-setup
+
+      // 并行加载所有必要数据
+      await Promise.all([
+        userStore.fetchUserProfile(), // 获取 gender
+        fetchInter(), // 获取推荐用户
+        fetchNewcomers(),
+        fetchDynamicMenu().then(authStore.setMenuItems),
+        paymentStore.checkPaymentStatus(),
+      ]);
+
+      if (paymentStore.isPaid) {
+        await initializeUserData();
       }
     }
-    console.log('tabs: ',tabs.value)
 
-    // 如果已支付，立即初始化用户数据
-    if (paymentStore.isPaid) {
-      await initializeUserData();
-    }
+    isReady.value = true;
+  } catch (error) {
+    console.error('页面初始化失败:', error);
+  } finally {
+    isLoading.value = false;
   }
 });
 
