@@ -282,7 +282,7 @@
       </van-swipe-item>
 
       <!-- 信仰 -->
-      <van-swipe-item>
+      <!-- <van-swipe-item v-if="false">
         <div class="setup-card">
           <div class="card-icon">🙏</div>
           <h2 class="card-title">信仰（可选）</h2>
@@ -305,10 +305,10 @@
 </van-popup>
           </div>
         </div>
-      </van-swipe-item>
+      </van-swipe-item> -->
 
       <!-- MBTI -->
-      <van-swipe-item>
+      <!-- <van-swipe-item v-if="false">
         <div class="setup-card">
           <div class="card-icon">🧠</div>
           <h2 class="card-title">MBTI人格（可选）</h2>
@@ -325,7 +325,7 @@
             </div>
           </div>
         </div>
-      </van-swipe-item>
+      </van-swipe-item> -->
 
       <!-- 联系方式 -->
       <van-swipe-item>
@@ -470,7 +470,7 @@ const formData = ref({
 });
 
 const totalSteps = computed(() => {
-  let steps = 14; // 固定显示的总页数（不含孩子状况）
+  let steps = 13; // 固定显示的总页数（不含孩子状况）
   if (formData.value.married === 1) {
     steps += 1; // 已婚时加1页（孩子状况）
   }
@@ -607,11 +607,11 @@ const canProceed = computed(() => {
     case 8: return formData.value.occupation !== '';
     case 9: return formData.value.income !== '';
     case 10: return formData.value.education !== '';
-    case 11: return true; // 信仰可选
-    case 12: return true; // MBTI可选
-    case 13: return formData.value.phone !== '' && phoneValidator(formData.value.phone); // 手机号必填且格式正确
-    case 14: return true; // 简介可选
-    case 15: return true; // 隐私简介可选
+    // case 11: return true; // 信仰可选
+    // case 12: return true; // MBTI可选
+    case 11: return formData.value.phone !== '' && phoneValidator(formData.value.phone); // 手机号必填且格式正确
+    case 12: return true; // 简介可选
+    case 13: return true; // 隐私简介可选
     default: return false;
   }
 });
@@ -621,13 +621,22 @@ const canProceed = computed(() => {
 //   currentStep.value = index + 1;
 // };
 
+// const getSwipeIndex = (step: number) => {
+//   // 如果未婚，且逻辑步骤 >= 6，swipe索引要减1
+//   if (formData.value.married === 0 && step >= 6) {
+//     return step - 2; // 跳过第6步
+//   }
+//   return step - 1;
+// };
 const getSwipeIndex = (step: number) => {
-  // 如果未婚，且逻辑步骤 >= 6，swipe索引要减1
+  let offset = 0;
   if (formData.value.married === 0 && step >= 6) {
-    return step - 2; // 跳过第6步
+    offset += 1; // 未婚时跳过孩子状况
   }
-  return step - 1;
+  return step - 1 - offset;
 };
+
+
 
 const nextStep = () => {
   if (currentStep.value === totalSteps.value) {
@@ -643,6 +652,8 @@ const prevStep = () => {
   currentStep.value--;
   swipeRef.value?.swipeTo(getSwipeIndex(currentStep.value));
 };
+
+
 
 
 
