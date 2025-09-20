@@ -8,7 +8,7 @@ interface FilterState {
 }
 
 const currentYear = new Date().getFullYear();
-const defaultEndYear = currentYear - 18;
+const defaultEndYear = currentYear - 0;
 
 export const useExploreStore = defineStore('explore', () => {
   // 持久化状态
@@ -17,7 +17,7 @@ export const useExploreStore = defineStore('explore', () => {
     heightFilter: '',
     selectedAreaCode: '',
     selectedAreaText: '',
-    startYear: ['1980'],
+    startYear: ['1950'],
     endYear: [defaultEndYear.toString()],
     activeFilters: {} as Record<number, boolean>, // 存储filter的激活状态
     selectedZodiacs: [] as string[],

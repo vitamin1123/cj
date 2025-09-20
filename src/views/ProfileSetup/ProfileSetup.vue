@@ -417,6 +417,7 @@ import { areaList } from '@vant/area-data';
 import lunisolar from 'lunisolar';
 import apiClient from '@/plugins/axios';
 import { useUserInfoStore } from '@/store/userinfo'
+import type { UserProfile } from '@/store/userinfo';
 import { getPreviousRoute } from '@/utils/routeHistory';
 
 const userStore = useUserInfoStore()
@@ -681,11 +682,36 @@ const submitForm = async () => {
     // 调用API提交表单数据
     const response = await apiClient.post('/api/profile', profileData);
     
-    if (response.status === 200) {
-      showSuccessToast('信息保存成功！');
-      router.replace('/home');
-    } else {
-      showFailToast('保存失败，请重试');
+    if (response.data?.status === 'success') {
+      showSuccessToast('资料已提交审核')
+
+      /* 1. 拼一份完整 UserProfile */
+      const localProfile: UserProfile = {
+        id: 0,
+        nickname: '',
+        phone: formData.value.phone,
+        gender: formData.value.gender,
+        birth_date: profileData.birth_date!,
+        height: profileData.height!,
+        weight: profileData.weight!,
+        region_code: formData.value.regionCode,
+        occupation: formData.value.occupation,
+        education: formData.value.education,
+        income_level: formData.value.income,
+        religion: formData.value.religion || '',
+        mbti: formData.value.mbti || '',
+        mem: formData.value.bio,
+        mem_pri: formData.value.privateBio,
+        avatar: '',
+        avatar_url: '',
+        photo: '',
+        points: 0
+      }
+
+      /* 2. 写本地 + 写 pinia */
+      userStore.updateProfileAndCache(localProfile)
+
+      router.replace('/home')
     }
   } catch (error) {
     showFailToast('保存失败，请重试');
@@ -746,7 +772,7 @@ const formatDate = (date: Date) => {
 //   } catch (error) {
 //     console.error('加载用户资料失败:', error);
 //     // 如果是404，表示用户资料不存在，可以忽略
-   
+//    
 //   }
 // });
 
