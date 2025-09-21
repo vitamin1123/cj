@@ -245,18 +245,24 @@
       <van-swipe-item>
         <div class="setup-card">
           <div class="card-icon">💰</div>
-          <h2 class="card-title">收入水平</h2>
-          <p class="card-subtitle">选择你的收入范围</p>
-          <div class="income-options">
-            <div 
-              v-for="income in incomeOptions"
-              :key="income.value"
-              class="income-option"
-              :class="{ active: formData.income === income.value }"
-              @click="formData.income = income.value"
+          <h2 class="card-title">年收入</h2>
+          <p class="card-subtitle">请输入您的年收入</p>
+          <div class="input-container">
+            <van-field
+              v-model="formData.income"
+              type="number"
+              label="年收入"
+              placeholder=""
+              input-align="center"
+              :formatter="incomeFormatter"
+              :rules="[{ required: true, message: '请输入年收入' }, { validator: incomeValidator, message: '请输入有效的年收入' }]"
+              class="setup-input"
+              @keyup.enter="handleEnter"
             >
-              {{ income.label }}
-            </div>
+              <template #right-icon>
+                <span class="input-unit">万元</span>
+              </template>
+            </van-field>
           </div>
         </div>
       </van-swipe-item>
@@ -458,7 +464,7 @@ const formData = ref({
   region: '',
   regionCode: '321282', 
   occupation: '',
-  income: '',
+  income: 0.00,
   education: '',
   religion: '',
   religionText: '',
@@ -547,14 +553,6 @@ const onAreaConfirm = ({ selectedOptions }: { selectedOptions: Array<{ text: str
 };
 
 // 选项数据
-const incomeOptions = [
-  { label: '3K以下', value: 'below_3k' },
-  { label: '3K-5K', value: '3k_5k' },
-  { label: '5K-8K', value: '5k_8k' },
-  { label: '8K-12K', value: '8k_12k' },
-  { label: '12K-20K', value: '12k_20k' },
-  { label: '20K以上', value: 'above_20k' }
-];
 
 const educationOptions = [
   { label: '高中及以下', value: 'high_school' },
@@ -590,6 +588,28 @@ const heightValidator = (value: string | number) => {
   return num >= 120 && num <= 240;
 };
 
+// 收入格式化与校验
+const incomeFormatter = (value: string) => {
+  // 允许输入数字和小数点
+  let filtered = value.replace(/[^\d.]/g, '');
+  // 只允许一个小数点
+  if (filtered.split('.').length > 2) {
+    filtered = filtered.substring(0, filtered.lastIndexOf('.'));
+  }
+  // 小数点后最多两位
+  const parts = filtered.split('.');
+  if (parts.length > 1 && parts[1].length > 2) {
+    parts[1] = parts[1].slice(0, 2);
+    filtered = parts.join('.');
+  }
+  return filtered;
+};
+
+const incomeValidator = (value: string | number) => {
+  const num = Number(value);
+  return !isNaN(num) && num >= 0 && num < 10000; // 允许0，最大不超过1亿
+};
+
 const phoneValidator = (value: string) => {
   const phoneRegex = /^1[3-9]\d{9}$/;
   return phoneRegex.test(value);
@@ -606,7 +626,7 @@ const canProceed = computed(() => {
     case 6: return formData.value.child < 2; // 孩子状况必选
     case 7: return formData.value.region !== '';
     case 8: return formData.value.occupation !== '';
-    case 9: return formData.value.income !== '';
+    case 9: return formData.value.income && incomeValidator(formData.value.income);
     case 10: return formData.value.education !== '';
     // case 11: return true; // 信仰可选
     // case 12: return true; // MBTI可选
@@ -697,7 +717,7 @@ const submitForm = async () => {
         region_code: formData.value.regionCode,
         occupation: formData.value.occupation,
         education: formData.value.education,
-        income_level: formData.value.income,
+        income_level: profileData.income_level,
         religion: formData.value.religion || '',
         mbti: formData.value.mbti || '',
         mem: formData.value.bio,
@@ -751,7 +771,7 @@ const formatDate = (date: Date) => {
 //       formData.value.region = profile.region || '';
 //       formData.value.regionCode = profile.region_code || '321282';
 //       formData.value.occupation = profile.occupation || '';
-//       formData.value.income = profile.income_level || '';
+//       formData.value.income = profile.income ? String(profile.income) : '';
 //       formData.value.education = profile.education || '';
 //       formData.value.religion = profile.religion || '';
 //       formData.value.mbti = profile.mbti || '';
@@ -808,7 +828,7 @@ const loadDataFromStore = () => {
   }
   
   formData.value.occupation = profile.occupation || '';
-  formData.value.income = profile.income_level || '';
+  formData.value.income = profile.income_level ? Number(profile.income_level) : 0;
   formData.value.education = profile.education || '';
   
   // 宗教值映射到显示文本

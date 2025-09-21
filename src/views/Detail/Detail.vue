@@ -66,8 +66,8 @@
             <span class="value">{{ displayReligion }}</span>
           </div>
           <div class="info-item">
-            <span class="label">月收入</span>
-            <span class="value">{{ displayIncome }}</span>
+            <span class="label">年收入</span>
+            <span class="value">{{ userInfo.income_level + "万元" }}</span>
           </div>
           <div class="info-item full-width">
             <span class="label">地区</span>
@@ -293,7 +293,6 @@ const getDefaultAvatarUrl = () => {
     : '/avatars/female_def.png';
 };
 
-const incomeMap: Record<string, string> = { 'below_3k': '3千元以下', '3k_5k': '3千-5千元', '5k_8k': '5千-8千元', '8k_12k': '8千-1.2万元', '12k_20k': '1.2万-2万元', 'above_20k': '2万元以上' };
 const educationMap: Record<string, string> = { 'high_school': '高中及以下', 'college': '大专', 'bachelor': '本科', 'master': '硕士', 'phd': '博士' };
 const religionMap: Record<string, string> = { 'buddhism': '佛教', 'christianity': '基督教', 'islam': '伊斯兰教', 'taoism': '道教', 'none': '无宗教信仰', 'other': '其他' };
 
@@ -316,7 +315,11 @@ const parseRegion = (code: string) => {
 };
 
 const displayRegion = computed(() => parseRegion(userInfo.value.region_code));
-const displayIncome = computed(() => incomeMap[userInfo.value.income_level] || '未填写');
+// const displayIncome = computed(() => {
+//   const income = userInfo.value.income_level;
+//   if (income === null || income === undefined || income === '') return '未填写';
+//   return `${Number(income).toFixed(2)} 万元`;
+// });
 const displayEducation = computed(() => educationMap[userInfo.value.education] || '未填写');
 const displayReligion = computed(() => religionMap[userInfo.value.religion] || '未填写');
 

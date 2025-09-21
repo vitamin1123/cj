@@ -18,7 +18,7 @@ interface User {
   gender: string
   height: number
   id: number
-  income_level: string
+  income_level: number
   mem: string
   nickname: string
   occupation: string

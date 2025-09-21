@@ -44,8 +44,8 @@
             <span class="value">{{ displayReligion }}</span>
           </div>
           <div class="info-item">
-            <span class="label">月收入</span>
-            <span class="value">{{ displayIncome }}</span>
+            <span class="label">年收入</span>
+            <span class="value">{{ userInfo.income_level + "万元" }}</span>
           </div>
           <div class="info-item" @click.stop="copyPhone(userInfo.phone)">
             <span class="label">手机号码</span>
@@ -53,10 +53,10 @@
               <span class="value">{{ userInfo.phone || '未填写' }}</span>
             </div>
           </div>
-          <div class="info-item">
+          <!-- <div class="info-item">
             <span class="label">MBTI</span>
             <span class="value">{{ userInfo.mbti || '未填写' }}</span>
-          </div>
+          </div> -->
           <div class="info-item full-width">
             <span class="label">地区</span>
             <span class="value">{{ displayRegion }}</span>
@@ -220,14 +220,7 @@ const copyPhone = (phone: string) => {
 };
 
 // 收入、学历、宗教信仰映射
-const incomeMap: Record<string, string> = {
-  below_3k: '3千元以下',
-  '3k_5k': '3千-5千元',
-  '5k_8k': '5千-8千元',
-  '8k_12k': '8千-1.2万元',
-  '12k_20k': '1.2万-2万元',
-  above_20k: '2万元以上'
-}
+
 const educationMap: Record<string, string> = {
   high_school: '高中及以下',
   college: '大专',
@@ -245,7 +238,7 @@ const religionMap: Record<string, string> = {
 }
 
 // 计算属性
-const displayIncome = computed(() => incomeMap[userInfo.value?.income_level] || '未填写')
+
 const displayEducation = computed(() => educationMap[userInfo.value?.education] || '未填写')
 const displayReligion = computed(() => religionMap[userInfo.value?.religion] || '未填写')
 

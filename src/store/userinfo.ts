@@ -78,6 +78,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiClient from '@/plugins/axios'
+import { NumberKeyboardTheme } from 'vant'
 
 /* ---------- 类型定义 ---------- */
 export interface UserProfile {
@@ -91,7 +92,7 @@ export interface UserProfile {
   region_code: string
   occupation: string
   education: string
-  income_level: string
+  income_level: number
   religion: string
   mbti: string
   mem: string
